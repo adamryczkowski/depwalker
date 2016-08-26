@@ -2,6 +2,7 @@
 
 export(add.objectrecord)
 export(add.parent)
+export(are.two.metadatas.equal)
 export(create.metadata)
 export(get.object)
 export(load.metadata)
@@ -9,3 +10,4 @@ export(load.object)
 export(make.sure.metadata.is.saved)
 export(metadata.digest)
 export(metadata.dump)
+import(data.table)

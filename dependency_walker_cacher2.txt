@@ -1,0 +1,54 @@
+#TODO: Dodaj składową metadata: othercodepath zawierającą listę pozostałych (nie-R) plików z kodem źródłowym. Te pliki będą hashowane w kolejności alfabetycznej ich pełnej ścieżki.
+OK #TODO: Zrób refactoring tak, aby umożliwić kilka obiektów z jednych metadanych.
+OK #TODO: Niech digest z parents liczy się nie z digest poszczególnych parents, ale z posortowanych par (nazwa, ścieżka) 
+
+#parentrecord:
+# name
+# path (długość dokładnie 1), relatywna do metadata.path
+# [aliasname] - Jeśli obecne, to to jest wskazówka, żeby ten obiekt był dostępny właśnie pod tą nazwą, a nie oryginalną. Ma to pomóc w razie ew. konfliktu nazw.
+# [digest] (digest tego przodka. Jeśli okaże się, że digest uległ zmianie, to należy na nowo nas policzyć i zaktualizować digest)
+
+#objectrecord:
+# name - nazwa obiektu (może być więcej, niż jedna)
+# path - ścieżka  (długość dokładnie 1), relatywna do metadata.path
+# compress - użyta metoda kompresji pliku
+# [mtime] - timestamp stworzenia obiektu (ta właściwość nie jest zapisana do pliku z metainformacjami, bo nie jest dostępna w momencie zapisywania)
+# [filedigest] - md5 zapisanego pliku w R (z atrybutami wszystkimi poza filedigest)
+# [filesize]
+# [size] - wielkość obiektu
+# [objectdigest] - digest samego obiektu w R (bez atrybutów)
+
+
+#Pola w obiekcie metadata:
+#
+# <path> - ścieżka z metadata. Ta informacja nie jest zapisywana na dysk
+# <code> - kod R. Ta składowa nie jest zapisywana, ale jest dodawana w momencie zapisania.
+# codepath - Ścieżka do kodu R transformacji relatywnego do miejsca zapisania metadata
+# parents - lista z rekordami parentrecord przodków
+# objectrecords - lista objectrecord obiektów. Każdy rekord jest opisany oddzielnie. Liczba rekordów taka sama, jak długość name.
+# flag.never.execute.parallel - Zaznaczać TRUE dla naprawdę dużych obiektów: TRUE oznacza, że dzieci tego obiektu będę uruchomione w tej samej (równoległej) sesji. Chodzi o to, żeby uniknąć kopiowania wielkiego obiektu między wątkami.
+# flag.force.recalculation - Zaznaczone, gdy chcemy wymusić ponowne przeliczenie. Po przeliczeniu flaga jest czyszczona.
+# [timecosts] - data.frame z listą czasów tworzenia tego obiektu. Z reguły będzie tylko jeden wpis.
+
+#Rekord timecost:
+#
+# walltime
+# cputime
+# systemtime
+# cpumodel - model CPU
+# membefore - ilość wolnej pamięci PRZED rozpoczęciem obliczeń
+# memafter
+# corecount - liczba fizycznych rdzeni
+# virtualcorecount - liczba wirtualnych rdzeni
+# busycpus - liczba wirtualnych rdzeni procesora, które są zajęte >75% nie wliczając bieżącego wątku
+
+#Rekord time.estimation
+#
+# * path - ścieżka do metadata
+# * objects - nazwy ładowanych obiektów, tak jak je widzi skrypt je generujący
+# * script.time - statystyki czasu wykonania skryptu: cputime oraz walltime
+# * load.modes - sposób wczytania dla każdego z obiektówdown
+down: 1 - z pamięci, 2 - z dysku, 3 - poprzez skrypt
+# * disk.load.time - estymowany czas wczytywania z dysku
+# * parents - lista o liściu dla każdego z metadata parents
+

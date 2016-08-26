@@ -50,7 +50,7 @@ assertMetadata<-function(metadata)
   {
     assertObjectRecordMetadata(objectrecord, metadata)
   }
-  for (parentrecord in metadata$parentrecords)
+  for (parentrecord in metadata$parents)
   {
     assertParentRecordMetadata(parentrecord, metadata)
   }

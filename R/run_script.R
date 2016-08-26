@@ -5,13 +5,14 @@ capture.evaluate<-function(code, envir=.GlobalEnv)
   err_handler<-function(msg)
   {
     sc<-sys.calls()
-    pos=max(which(!is.na(match(lapply(sc,deparse),'eval(expr, envir, enccheckmate::los)'))))
+    pos=max(which(!is.na(match(lapply(sc,deparse),'eval(expr, envir, enclos)'))))
     b<-sc[(pos+1):(length(sc)-3)]
     cat(paste0("\nError: ", msg$message, " on ", deparse(msg$call)))
     cat("\nTrace:\n")
     mytraceback(b)
     is_error<<-TRUE
   }
+  #debugonce(err_handler)
 
   msg_handler<-function(msg)
   {

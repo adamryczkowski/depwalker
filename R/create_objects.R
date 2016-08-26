@@ -49,7 +49,7 @@ create.objects<-function(
   if (length(objects.to.keep)!=length(objectaliases))
     stop("length of objects.to.keep doesn't match length of objectaliases.")
   names<-sapply(metadata$objectrecords, function(or) or$name)
-  if (length(names)>length(objects.to.keep))
+  if (length(names)<length(objects.to.keep))
     stop("More objects to keep than there are objects available in metadata")
   if (length(names)>1)
     matches=objects.to.keep %in% names
@@ -74,7 +74,7 @@ create.objects<-function(
   }
 
   #Now we execute the script
-  ans<-run.script(metadata, objects.to.keep,estimation.only=estimation.only)
+  ans<-run.script(metadata, names,estimation.only=estimation.only)
   if (flag.estimation.only)
   {
     return(ans)
@@ -101,32 +101,32 @@ create.objects<-function(
     gc()
 
   #Zapisujemy wszystkie wyprodukowane obiekty (nie tylko te, o które byliśmy poproszeni)
-  flag.save.in.background=TRUE
+  #flag.save.in.background=TRUE
   if (flag.save.intermediate.objects)
   {
     con<-list()
     for(objectrecord in metadata$objectrecords)
     {
       if (flag.save.in.background)
-      {
+      { # nocov start
         con<-tryCatch(parallel::mcparallel(
           {
             save.object(metadata=metadata,
                         objectrecord=objectrecord,
                         flag.check.md5sum=flag.check.md5sum,
-                        flag.forget.object = TRUE);
+                        flag.forget.object = TRUE) ;
             1
           },
           paste0('save:',objectrecord$name),
           detached=FALSE)
-        ,error=function(e){class(e)<-'try-error';e})
-        if (attr(con,'class')!='try-error')
+        ,error=function(e){class(e)<-'try-error';e}) # nocov end
+        if ('try-error' %in% attr(con,'class'))
         {
           conname<-mangle.connection.name(path = pathcat::path.cat(dirname(metadata$path),objectrecord$path), objectname = objectrecord$name)
           assign(conname,con,envir=.GlobalEnv)
         }
       }
-      if(!flag.save.in.background || attr(con,'class')=='try-error')
+      if(!flag.save.in.background || 'try-error' %in% attr(con,'class'))
         save.object(metadata=metadata, objectrecord=objectrecord,flag.check.md5sum=flag.check.md5sum)
     }
   }
@@ -142,10 +142,12 @@ create.objects<-function(
       if (objrec$name != oa)
       {
         eval(parse(text=paste0(oa, '<-', objrec$name)),envir=.GlobalEnv)
-        rm(list=objrec$name,envir=.GlobalEnv)
+        if (exists(objrec$name, envir=.GlobalEnv)) # nocov
+          rm(list=objrec$name,envir=.GlobalEnv) # nocov
       }
     } else {
-      rm(list=objrec$name,envir=.GlobalEnv)
+      if (exists(objrec$name, envir=.GlobalEnv))
+        rm(list=objrec$name,envir=.GlobalEnv)
       flag.do.gc<-TRUE
     }
   }
@@ -161,7 +163,8 @@ create.objects<-function(
         n<-parent$aliasname
       if (! (n %in% objects.to.keep))
       {
-        rm(list=n,envir=.GlobalEnv)
+        if (exists(n, envir=.GlobalEnv))
+          rm(list=n,envir=.GlobalEnv)
         flag.do.gc<-TRUE
       }
     }

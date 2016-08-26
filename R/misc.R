@@ -44,13 +44,16 @@ get.codepath<-function(metadata)
   return(pathcat::path.cat(dirname(metadata$path), metadata$codepath))
 }
 
-get.parentpath<-function(parentrecord, metadata=NULL, metadata.path=NULL)
+get.parentpath<-function(parentrecord, metadata=NULL, metadata.path=NULL, flag_include_extension=TRUE)
 {
   if (is.null(metadata) & is.null(metadata.path))
     stop("Unkown metadata.path")
   if (is.null(metadata.path))
     metadata.path<-metadata$path
-  return(pathcat::path.cat(dirname(metadata.path), parentrecord$path))
+  ans<-pathcat::path.cat(dirname(metadata.path), parentrecord$path)
+  if (flag_include_extension)
+    ans<-paste0(ans,getOption('metadata.save.extension'))
+  return(ans)
 }
 
 get.objectpath<-function(objectrecord, metadata=NULL, metadata.path=NULL)
@@ -73,9 +76,86 @@ get.objectrecords<-function(metadata, objnames)
   return(metadata$objectrecords[idx])
 }
 
+#' Tests whether two task metadata's define the same task equal (not necessarily identical)
+#'
+#' @param m1 First metadata to compare
+#' @param m2 Second metadata to compare
+#' @return \code{TRUE} if identical, \code{FALSE} otherwise
+#' @export
 are.two.metadatas.equal<-function(m1, m2)
 {
   return(metadata.digest(m1)==metadata.digest(m2))
+}
+
+join.metadatas<-function(base_m, extra_m)
+{
+  #Two metadatas have the same digest - i.e. they agree on:
+  # 1. names and aliasnames of all parents
+  # 2. code
+  # 3. names of all exported symbols
+
+  dirty=FALSE
+
+  fnupdate<-function(name)
+  {
+    if (!is.null(extra_m[[name]]))
+    {
+      if (!is.null(base_m[[name]]))
+      {
+        if (extra_m[[name]] != base_m[[name]])
+        {
+          base_m[[name]]<<-extra_m[[name]]
+          return(TRUE)
+        }
+      } else {
+        base_m[[name]]<<-extra_m[[name]]
+        return(TRUE)
+      }
+    }
+    return(FALSE)
+  }
+
+  join_objectrecords<-function(base_o, extra_o)
+  {
+    dirty<-FALSE
+    fnupdate<-function(name)
+    {
+      if (!is.null(extra_o[[name]]))
+      {
+        if (extra_o[[name]] != base_o[[name]])
+        {
+          base_o[[name]]<<-extra_o[[name]]
+          return(TRUE)
+        }
+      }
+      return(FALSE)
+    }
+    dirty <- dirty || fnupdate('path')
+    dirty <- dirty || fnupdate('compress')
+    return(dirty)
+  }
+
+
+  dirty<-fnupdate('codepath')
+  dirty<-dirty || fnupdate('flag.never.execute.parallel')
+  dirty<-dirty || fnupdate('flag.force.recalculation')
+
+  for (i in seq_along(base_m$objectrecords))
+  {
+    base_o <- base_m$objectrecords[[i]]
+    extra_o <- extra_m$objectrecords[[i]]
+    if (join_objectrecords(base_o, extra_o))
+    {
+      base_m$objectrecords[[i]]<-extra_o
+      dirty<-TRUE
+    }
+  }
+  if (dirty)
+  {
+    return(base_m)
+  } else {
+    return(NULL)
+  }
 }
 
 get.objectrecord.by.parentrecord<-function(parentrecord, metadata)
@@ -134,6 +214,10 @@ metadata.objects.size<-function(metadata)
   suma<-bit64::as.integer64(0)
   for(objectrecord in metadata$objectrecords)
   {
+    if (is.null(objectrecord$size))
+    {
+      return(NA)
+    }
     suma<-suma+objectrecord$size
   }
   return(suma)

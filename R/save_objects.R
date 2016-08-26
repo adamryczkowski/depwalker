@@ -92,6 +92,7 @@ save.object<-function(
   } else
   {
     saveRDS(get(objectrecord$name, envir=.GlobalEnv),file=filename,compress=objectrecord$compress)
+    release.lock.file(path=get.objectpath(metadata = metadata, objectrecord =  objectrecord))
     if (flag.forget.object)
     {
       if (exists(objectrecord$name, envir = .GlobalEnv))
@@ -100,12 +101,12 @@ save.object<-function(
     }
   }
 
+  release.lock.file(path=get.objectpath(metadata = metadata, objectrecord =  objectrecord))
   objectrecord$mtime<-file.mtime(filename)
   objectrecord$filesize<-bit64::as.integer64(file.info(filename)$size)
   if (flag.check.md5sum)
     objectrecord$filedigest<-as.character(tools::md5sum(filename))
   metadata$objectrecords[[objectrecord$name]]<-objectrecord
   save.metadata(metadata=metadata) #
-  release.lock.file(path=get.objectpath(metadata = metadata, objectrecord =  objectrecord))
   return("OK")
 }

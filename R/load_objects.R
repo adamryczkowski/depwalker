@@ -24,8 +24,8 @@ take.object.from.memory<-function(objectrecord, aliasname=NULL, flag.check.objec
   # - objectsize musi się zgadzać lub
   # - objectdigest musi się zgadzać
 
-  if (eval(parse(text=paste0('exists("',objectrecord$name,'")')),envir = .GlobalEnv))
-    obj<-eval(parse(text=objectrecord$name),envir = .GlobalEnv)
+  if (exists(objectrecord$name,envir = .GlobalEnv))
+    obj<-get(x=objectrecord$name,envir = .GlobalEnv)
   else
     return(FALSE) #nie ma obiektu lub zła nazwa
 
@@ -126,7 +126,7 @@ load.object.from.disk<-function(metadata, objectrecord, aliasname=NULL, flag.don
     #digest is valid, we can load the object itself
     return('OK') #OK
   }
-  stop("It shouldn't be possible to reach this place")
+  stop("It shouldn't be possible to reach this place") # nocov
 }
 
 #' Sets the objects to NULL, effectively unloading them.
@@ -237,30 +237,26 @@ load.and.validate.parents<-function(metadata, flag.check.md5=FALSE,estimation.on
     return(TRUE)
   }
 
+#  browser()
 
   if (length(parents.objects)>1)
   {
     f<-sapply(parents.objects, is.it.worth.to.parallel)
-    f[[first]]<-FALSE #Jeden obiekt nie będzie musiał być równoległy. Niech to będzie obiekt największy
+    f[[first]]<-FALSE #There is no point in parallelizing one object.
+    #Let this non-forked object be the biggest one
+
     #If there are any children eligible for parallel computing, launch them now
-    idxs<-which(f) #Indeksy równoległych zadań
+    idxs<-which(f) #Indices of parallel tasks
     contexts<-list()
     if (sum(f)>0)
     {
       for(i in 1:sum(f))
       {
-        #If there are any children eligible for parallel computing, launch them now
-        idxs<-which(f) #Indeksy równoległych zadań
-        contexts<-list()
-        if (sum(f)>0)
-        {
-          for(i in 1:sum(f))
-          {
-            l=parents.objects[[idxs[i]]]
-            #Nie aplikujemy aliasów, bo nie tam będą obiekty używane
-            contexts[[i]]<-parallel::mcparallel(get.objects.by.metadata(metadata=l$metadata, metadata.path=l$metadata.path, objectnames=l$names))
-          }
-        }
+        l=parents.objects[[idxs[i]]]
+        #We don't translate object names into aliases, because the calculated objects
+        #will not be used there
+        #browser()
+        contexts[[i]]<-parallel::mcparallel(get.objects.by.metadata(metadata=l$metadata, metadata.path=l$metadata.path, objectnames=l$names, flag.drop.list.if.one.object=FALSE))
       }
     }
   } else
@@ -268,22 +264,23 @@ load.and.validate.parents<-function(metadata, flag.check.md5=FALSE,estimation.on
 
 
   #Now we launch non-parallel children sequentially
-  idxs<-which(!f) #Indeksy równoległych zadań
+  idxs<-which(!f) #Indices of non-parallel tasks
   for(i in 1:sum(!f))
   {
     l=parents.objects[[idxs[i]]]
     ans<-load.objects.by.metadata(metadata=l$metadata, metadata.path=pathcat::path.cat(dirname(metadata$path), l$metadata.path), objectnames=l$names, aliasnames=l$aliasnames)
     if (ans==FALSE)
-      return (FALSE) #Nie udało się wczytać...
+      return (FALSE) #We didn't manage to read
   }
 
   #Non-parallel tasks are done. Now we make sure all non-parallel are ready as well and we apply aliases
   if (sum(f)>0)
   {
+    idxs<-which(f)
     for(i in 1:sum(f))
     {
       l=parents.objects[[idxs[i]]]
-      obj<-parallel::mccollect(contexts[[i]])
+      obj<-parallel::mccollect(contexts[[i]])[[1]]
       if (is.null(obj))
         return (FALSE) #Nie udało się wczytać
       for (i in seq(along.with=l$names))

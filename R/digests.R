@@ -20,6 +20,15 @@
 #'
 #' @param metadata task's metadata object, based on which calculate the digest.
 #'
+#' The digest compirses the following items:
+#'
+#' \enumerate{
+#' \item names and aliasnames of all parents
+#' \item code
+#' \item names of all exported symbols
+#' }
+#' Everything else is ignored.
+#'
 #' @return string representing MD5 digest of the object in lowercase.
 #' @export
 metadata.digest<-function(metadata)
@@ -63,6 +72,7 @@ calculate.code.digest<-function(metadata)
 }
 
 #' Returns object's digest for testing equivalence of metadataas
+#' Digest is solely based on names of the objects:
 #' @param metadata Task's metadata
 objects.digest<-function(metadata)
 {
@@ -78,6 +88,29 @@ objects.digest<-function(metadata)
   objects<-paste0(objects, collapse = ' ')
   d<-digest::digest(objects, serialize=FALSE)
   checkmate::assertString(objects)
+  return(d)
+}
+
+#' Returns digest of object's parent information.
+#' This include:
+#' 1. name of the imported object
+#' 2. aliasname of the imported object as it is used by us
+parents.digest<-function(metadata)
+{
+  parentnames<-sapply(metadata$parents, function(x) {if(is.null(x$aliasname)) {x$name;} else {x$aliasname;}})
+
+  idx<-order(parentnames)
+  single.parent.digest<-function(idx)
+  {
+    p<-metadata$parents[[idx]]
+    if (is.null(p$aliasname))
+      return(paste0(p$path, "|", p$name))
+    else
+      return(paste0(p$path, "|", p$name,"|",p$aliasname))
+  }
+  parents<-sapply(idx, single.parent.digest)
+  parents<-paste0(parents, collapse = ' ')
+  d<-digest::digest(parents,serialize=FALSE)
   return(d)
 }
 

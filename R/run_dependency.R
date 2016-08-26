@@ -36,7 +36,11 @@ load.object<-function(metadata.path=NULL,
                       flag.check.md5sum=TRUE,
                       flag.save.in.background=TRUE, flag.check.object.digest=TRUE)
 {
-  checkmate::assertPathForOutput(metadata.path, overwrite=TRUE)
+
+  if (is.null(metadata.path) && is.null(metadata))
+  {
+    stop("You must provider either metadata or metadata.path argument.")
+  }
 
   if (is.null(metadata))
   {
@@ -45,10 +49,20 @@ load.object<-function(metadata.path=NULL,
     metadata <-make.sure.metadata.is.saved(metadata = metadata)
   }
 
+  if (is.null(metadata.path))
+  {
+    metadata.path<-metadata$path
+  } else {
+    checkmate::assertPathForOutput(metadata.path, overwrite=TRUE)
+  }
+
   if (is.null(objectnames))
     objectnames=names(metadata$objectrecords)
 
-  assertVariableNames(objectnames)
+  if (!is.null(objectnames))
+  {
+    assertVariableNames(objectnames)
+  }
 
   load.objects.by.metadata(
     metadata=metadata,
@@ -72,8 +86,30 @@ get.object<-function(
     flag.save.in.background=TRUE,
     flag.check.object.digest=TRUE)
 {
-  checkmate::assertPathForOutput(metadata.path, overwrite=TRUE)
-  assertMetadata(metadata)
+
+  if (!is.null(metadata.path))
+  {
+    checkmate::assertPathForOutput(metadata.path, overwrite=TRUE)
+    if (!is.null(metadata))
+    {
+      assertMetadata(metadata)
+      if (metadata$path != metadata.path)
+      {
+        stop ("Ambiguosly aspecified metadata: metadata.path doesn't point to metadata object")
+      }
+    } else {
+      metadata<-depwalker:::load.metadata(metadata.path)
+    }
+  } else {
+    if (!is.null(metadata))
+    {
+      assertMetadata(metadata)
+      metadata.path<-metadata$path
+    } else {
+      stop("You must provide either metadata.path or metadata parameter.")
+    }
+  }
+
   if (is.null(objectname))
   {
     objectname=names(metadata$objectrecords)
@@ -83,9 +119,9 @@ get.object<-function(
         metadata.path=metadata.path,
         metadata=metadata,
         objectnames=objectname,
-        flag.save.intermediate.objects=TRUE,
-        flag.save.in.background=TRUE,
-        flag.check.object.digest=TRUE))
+        flag.save.intermediate.objects=flag.save.intermediate.objects,
+        flag.save.in.background=flag.save.in.background,
+        flag.check.object.digest=flag.check.object.digest))
   {
     ans<-list()
     for (o in objectname)
@@ -139,10 +175,15 @@ load.objects.by.metadata<-function(
   assertMetadata(metadata)
   for(n in objectnames)
     assertVariableName(n)
-  for(n in aliasnames)
-    assertVariableName(n)
-  if (length(objectnames)!=length(aliasnames))
-    stop("Length of objectnames and aliasnames doesn't match")
+  if (is.null(aliasnames))
+  {
+    aliasnames<-objectnames
+  } else {
+    for(n in aliasnames)
+      assertVariableName(n)
+    if (length(objectnames)!=length(aliasnames))
+      stop("Length of objectnames and aliasnames doesn't match")
+  }
   checkmate::assertFlag(flag.save.intermediate.objects)
   checkmate::assertFlag(flag.check.md5sum)
   checkmate::assertFlag(flag.check.object.digest)
@@ -176,7 +217,7 @@ load.objects.by.metadata<-function(
     {
       objrec<-objrecs[[i]]
       aliasname<-aliasnames[i]
-      objectnames<-objectnames[i]
+      #objectnames<-objectnames[i]
       tryCatch(
         memobjects[i]<-take.object.from.memory(
                           objectrecord = objrec,
@@ -286,27 +327,29 @@ load.objects.by.metadata<-function(
 get.objects.by.metadata<-function(
     metadata,
     metadata.path,
-    objnames,
-    aliasnames,
+    objectnames,
+    aliasnames=NULL,
     flag.save.intermediate.objects=TRUE,
     flag.check.md5sum=FALSE,
     flag.save.in.background=TRUE,
-    flag.forget.parents=TRUE) #True oznacza, że się udało
+    flag.forget.parents=TRUE,
+    flag.drop.list.if.one.object=TRUE)
 {
   if (load.objects.by.metadata(
           metadata=metadata,
           metadata.path=metadata.path,
-          objectnames=objnames,
+          objectnames=objectnames,
+          aliasnames = aliasnames,
           flag.save.intermediate.objects=flag.save.intermediate.objects,
           flag.check.md5sum=flag.check.md5sum,
           flag.save.in.background=flag.save.in.background))
   {
     ans<-list()
-    for (n in objnames)
+    for (n in objectnames)
     {
       ans[[n]]<-get(n, envir=.GlobalEnv)
     }
-    if (length(objnames)>1)
+    if (length(objectnames)>1 || !flag.drop.list.if.one.object)
       return(ans)
     return(ans[[1]])
   } else

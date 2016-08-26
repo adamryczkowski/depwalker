@@ -1,4 +1,3 @@
-
 #' Metadata in tabular form
 #'
 #' @param metadata.path Path to task's metadata object
@@ -6,13 +5,12 @@
 #' For details see description.
 #'
 #' @return Returns list of 4 relational tables that fully describe the metadata of the task.
-#' It is should be used, when the tool used to communicate with R doesn't support lists.
+#' It is should be used, when the tool used to communicate with R does not support lists.
 #'
 #' Records in the main \code{metadata} table are identified by the \code{ID} field, which
 #' contains arbitrary number that distinguish different tasks between each other.
 #' The ID of the object loaded from the function argument can be set arbitrarily as
 #' \code{id} parameter for ease of parsing the tables with external tools.
-
 #' \strong{\code{metadata}}
 #' \describe{
 #'   \item{\code{id}}{task's unique ID}
@@ -36,7 +34,6 @@
 #'   \item{\code{code}}{R source code of the task.  If the task needs other code to work,
 #'    this code needs to be read separately.}
 #' }
-
 #' \strong{\code{objectrecords}}
 #' \describe{
 #'   \item{\code{parentid}}{task ID, that links each row from this table with table \code{metadata}
@@ -69,7 +66,7 @@
 #'    being used in the task's R script. This field gives flexibility in naming objects across tasks}
 #'   \item{\code{path}}{path to the parent's task's metadata}
 #'  }
-#' \strong\code{timecosts}}
+#' \strong{\code{timecosts}}
 #'
 #' Each row describe statistics of each recalculation of this task.
 #' \describe{
@@ -102,7 +99,9 @@ metadata.dump<-function(metadata.path, id=NULL)
   for(i in seq(along.with=m$parents))
   {
     myid<-myid+1
-    path<-get.parentpath(parentrecord = m$parents[[i]], metadata=m)
+    path<-get.parentpath(parentrecord = m$parents[[i]],
+                         metadata=m,
+                         flag_include_extension=FALSE)
     a<-metadata.dump(path, myid)
     myid<-a$id
     a$id<-NULL
@@ -145,6 +144,17 @@ metadata.one.dump<-function(metadata, id)
 
   m$metadatadigest<-metadata.digest(metadata)
 
+  DT<-data.table::data.table(
+    name=character(0),
+    path=character(0),
+    compress=character(0),
+    mtime=character(0),
+    filedigest=character(0),
+    filesize=bit64::integer64(0),
+    size=bit64::integer64(0),
+    objectdigest=character(0),
+    flags=integer(0),parentid=integer(0))
+
 
   if (length(metadata$objectrecords)>0)
   {
@@ -157,62 +167,62 @@ metadata.one.dump<-function(metadata, id)
         f4<-load.object.from.disk(metadata=metadata, objectrecord = o, flag.dont.load = TRUE )=='OK'
       else
         f4<-FALSE
-      o$flags[[i]]<-f1*1+f2*2+f4*4
+      o$flags<-f1*1+f2*2+f4*4
       o$parentid<-id
-      o$path=get.objectpath(objectrecord = m$objectrecords[[i]], metadata=metadata)
-      if (i==1)
+      if (!is.null(o$mtime))
       {
-        dt<-data.table::as.data.table(o)
-      } else
-      {
-        dt<-rbind(dt, o)
+        o$mtime<-as.character(o$mtime)
       }
+      o$path=get.objectpath(objectrecord = m$objectrecords[[i]], metadata=metadata)
+      if (is.null(o$filesize))
+      {
+        o$filesize<-bit64::as.integer64(NA)  #Otherwise weird values get inserted due to the bit64 format.
+      }
+      if (is.null(o$size))
+      {
+        o$size<-bit64::as.integer64(NA)
+      }
+      DT<-rbind(DT, o, fill=TRUE)
     }
-    o<-dt
-  } else
-    o<-data.table::data.table(
-      name=character(0),
-      path=character(0),
-      compress=character(0),
-      mtime=character(0),
-      filedigest=character(0),
-      filesize=bit64::integer64(0),
-      size=bit64::integer64(0),
-      objectdigest=character(0),
-      flags=integer(0),parentid=integer(0))
+  }
+  o<-DT
   m$objectrecords<-NULL
 
+  dt<-data.table::data.table(
+    name=character(0),
+    path=character(0),
+    aliasname=character(0),
+    metadatadigest=character(0),
+    parentid=integer(0))
   if (length(metadata$parents)>0)
   {
     for(i in seq(along.with=metadata$parents))
     {
       p<-m$parents[[i]]
-      m2<-load.metadata(get.parentpath(parentrecord = p, metadata = metadata))
+      if (is.null(p$aliasname))
+        p$aliasname<-NA
+      m2<-load.metadata(get.parentpath(
+        parentrecord = p,
+        metadata = metadata,
+        flag_include_extension=FALSE))
       if (!is.null(m2))
       {
-        p$metadatadigest[[i]]<-metadata.digest(m2)
+        p$metadatadigest<-metadata.digest(m2)
       } else {
-        p$metadatadigest[[i]]<-NA
+        p$metadatadigest<-NA
       }
       p$path=get.parentpath(parentrecord = m$parents[[i]],metadata=metadata)
       p$parentid<-id
-      if (i==1)
-      {
-        dt<-data.table::as.data.table(p)
-      } else
-      {
+      # if (i==1)
+      # {
+      #   dt<-data.table::as.data.table(p)
+      # } else
+      # {
         dt<-rbind(dt, p)
-      }
+      # }
     }
-    p<-dt
-  } else {
-    p<-data.table::data.table(
-      name=character(0),
-      path=character(0),
-      aliasname=character(0),
-      metadatadigest=character(0),
-      parentid=integer(0))
   }
+  p<-dt
   m$parents<-NULL
   m$codedigest<-calculate.code.digest(metadata = metadata)
   m$codepath<-get.codepath(metadata = metadata)

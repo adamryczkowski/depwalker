@@ -40,11 +40,26 @@ create.metadata<-function(code, metadata.path, flag.never.execute.parallel=FALSE
 #' @return modified \code{metadata} argument that includes specified parent's record.
 #' @export
 #' @seealso \code{\link{create.metadata}}, \code{\link{add.objectrecord}}
-add.parent<-function(metadata, name, metadata.path, aliasname=NULL)
+add.parent<-function(metadata, name=NULL, metadata.path, aliasname=NULL)
 {
-  assertMetadata(metadata)
-  checkmate::assertString(name)
   assertValidPath(metadata.path)
+  assertMetadata(metadata)
+
+  if (is.null(name))
+  {
+    parent<-load.metadata(metadata.path)
+    if (is.null(parent))
+      stop("Cannot find the parent")
+
+    counts<-sum(plyr::laply(parent$objectrecords, function(or){names=or$name; return(length(names))}))
+    if (counts==1)
+      name<-paste0(parent$objectrecords[[1]]$name,collapse="; ")
+    else
+      stop(paste0("Cannot unambiguously infer name of the imported object as there are ",counts, " exported objects in the parent."))
+  }
+
+
+  checkmate::assertString(name)
   if (!is.null(aliasname))
   {
     assertVariableName(aliasname)
@@ -52,7 +67,14 @@ add.parent<-function(metadata, name, metadata.path, aliasname=NULL)
   } else
     varname=name
   parents<-metadata$parents
-  parentnames<-sapply(parents, function(x) {if (is.null(x$aliasname)) {x$name;} else {x$aliasname}})
+  parentnames<-sapply(
+    parents,
+    function(x) {
+      if (is.null(x$aliasname)) {
+        x$name
+      } else {
+        x$aliasname
+  }})
 
   if (varname %in% parentnames)
   {
@@ -88,10 +110,15 @@ add.parent<-function(metadata, name, metadata.path, aliasname=NULL)
 #' @export
 #' @seealso \code{\link{create.metadata}}, \code{\link{add.parent}}
 #' @export
-add.objectrecord<-function(metadata, name, path, compress='xz')
+add.objectrecord<-function(metadata, name, path=NULL, compress='xz')
 {
   checkmate::assertString(name)
+  if (is.null(path))
+  {
+    path = file.path(dirname(metadata$path), name)
+  }
   assertValidPath(path)
+
   assertMetadata(metadata)
   checkmate::assertChoice(compress, c('xz','gzip','bzip2',FALSE))
   objectrecords<-metadata$objectrecords
@@ -99,6 +126,7 @@ add.objectrecord<-function(metadata, name, path, compress='xz')
   if (name %in% objectnames)
   {
     #Już jest ta nazwa w parentrrecords... Najpierw usuwamy poprzednią
+    warning(paste0('object "', name, '" is already present in the exports of the task. Overwriting.'))
     idx<-which(objectnames==name)
     objectrecords[idx]<-NULL
   }

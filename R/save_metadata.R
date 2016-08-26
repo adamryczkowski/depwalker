@@ -20,13 +20,18 @@
 make.sure.metadata.is.saved<-function(metadata)
 {
   assertMetadata(metadata)
-  metadata.path<-metadata@path
+  metadata.path<-metadata$path
   checkmate::assertPathForOutput(metadata.path, overwrite=TRUE)
 
   if (file.exists(paste0(metadata.path,getOption('metadata.save.extension'))))
     metadata.disk<-load.metadata(metadata.path)
   else
     metadata.disk<-NULL
+
+  if (length(metadata$objectrecords)==0)
+  {
+    warning("Saving task without any exported R object. Such tasks are pretty useless")
+  }
 
   if(is.null(metadata.disk))
   {
@@ -36,9 +41,18 @@ make.sure.metadata.is.saved<-function(metadata)
   {
     ans<-are.two.metadatas.equal(m1 = metadata, m2 = metadata.disk)
     if (ans)
+    {
+      metadata.new<-join.metadatas(base_m = metadata.disk, extra_m = metadata)
+      if (!is.null(metadata.new))
+      {
+        save.metadata(metadata=metadata.new)
+        return(metadata.new)
+      }
       return(metadata.disk)
-    metadata<-save.metadata(metadata=metadata)
-    return(metadata)
+    } else {
+      metadata<-save.metadata(metadata=metadata)
+      return(metadata)
+    }
   }
 }
 

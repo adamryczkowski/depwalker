@@ -1,11 +1,13 @@
 Package: depwalker
 Type: Package
-Title: What the Package Does (Title Case)
+Title: Dependency Tracking System for R Scripts
 Version: 0.1.0
-Author: Who wrote it
-Maintainer: Who to complain to <yourfault@somewhere.net>
-Description: More about what it does (maybe more than one line)
-License: What license is it under?
+Author: Adam Ryczkowski
+Maintainer: <adam@statystyka.net>
+Description: Allows declarations of dependencies (order of execution) between R scripts.
+             Caches results. Executes as much as possible in parallel (Linux only).
+             Tracks changes of dependencies and optimizes scripts re-run.
+License: LGPL-3
 LazyData: TRUE
 Imports:
     digest,
@@ -16,8 +18,10 @@ Imports:
     sfsmisc,
     yaml,
     pathcat,
+    data.table,
     evaluate
 Depends:
     data.table,
     bit64
 RoxygenNote: 5.0.1
+Suggests: testthat
