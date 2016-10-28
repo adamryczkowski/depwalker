@@ -33,8 +33,7 @@ and instead it returns detailed trace of the computations it is going to perform
 by high-level function \code{metadata.dump}}
 }
 \value{
-If \code{is.null(estiation.only)} it returns boolean, where \code{TRUE} means success,
-and \code{FALSE} means failure.
+If \code{is.null(estiation.only)} it returns either updated metadata on success or NULL on failre.
 Otherwise it returns updated run statistics
 }
 \description{

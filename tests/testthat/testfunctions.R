@@ -146,3 +146,15 @@ testf13<-function(tmpdir)
   depwalker:::make.sure.metadata.is.saved(m)
   m
 }
+
+testf14<-function(tmpdir)
+{
+  #Task that has more than one source file
+  code<-"source('aux.R')"
+  m<-depwalker:::create.metadata(code, file.path(tmpdir,"task14"))
+  m<-depwalker:::add.objectrecord(m,"x",file.path(tmpdir, "x"));
+  m<-depwalker::add_source_file(m, 'aux.R', 'x<-42')
+  m<-depwalker::add_source_file(m, 'aux.txt', 'Whatever')
+
+  depwalker:::make.sure.metadata.is.saved(m);m
+}

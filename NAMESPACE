@@ -2,8 +2,10 @@
 
 export(add.objectrecord)
 export(add.parent)
+export(add_source_file)
 export(are.two.metadatas.equal)
 export(create.metadata)
+export(get.codepath)
 export(get.object)
 export(load.metadata)
 export(load.object)

@@ -68,6 +68,11 @@ save.metadata<-function(metadata)
   m$path<-NULL
   m$code<-NULL
 
+  if (!is.null(metadata$execution.directory))
+  {
+    m$execution.directory<-metadata$execution.directory
+  }
+
   for (i in seq(along.with=m$objectrecords))
   {
     o<-m$objectrecords[[i]]
@@ -79,7 +84,7 @@ save.metadata<-function(metadata)
       m$objectrecords[[i]]$mtime<-as.character(o$mtime)
   }
 
-  #Prosta funkcja, która zapisuje metadane na dysk.
+  #Simple function that saves metadata on disk
 
   if (!is.null(metadata$timecosts))
   {

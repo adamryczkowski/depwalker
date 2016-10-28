@@ -25,7 +25,7 @@
 #'  ready for other things. Default: \code{TRUE}. Ignored, if \code{flag.save.intermediate.objects==FALSE}.
 #' @param flag.check.object.digest If set, MD5 signature of all created R objects will be computed and
 #'  stored in metadata. It will be used to further verify authenticity of the object, when retrieved from memory.
-#' @return \code{load.object} returns boolean. \code{TRUE} if success, and \code{FALSE} on failure.
+#' @return \code{load.object} returns updated metadata on success, and \code{NULL} on failure.
 #'   \code{get.object} returns the object itself, if there is only one object to return,
 #'   a named list of objects, if requested to return more than one object, or \code{NULL} on failure.
 #' @export
@@ -115,13 +115,14 @@ get.object<-function(
     objectname=names(metadata$objectrecords)
   }
   assertVariableNames(objectname)
-  if (load.object(
-        metadata.path=metadata.path,
-        metadata=metadata,
-        objectnames=objectname,
-        flag.save.intermediate.objects=flag.save.intermediate.objects,
-        flag.save.in.background=flag.save.in.background,
-        flag.check.object.digest=flag.check.object.digest))
+  ans<-load.object(
+    metadata.path=metadata.path,
+    metadata=metadata,
+    objectnames=objectname,
+    flag.save.intermediate.objects=flag.save.intermediate.objects,
+    flag.save.in.background=flag.save.in.background,
+    flag.check.object.digest=flag.check.object.digest)
+  if (!is.null(ans))
   {
     ans<-list()
     for (o in objectname)
@@ -155,7 +156,8 @@ get.object<-function(
 #'  stored in metadata. It will be used to further verify authenticity of the object, when retrieved from memory.
 #' @param flag.estimate.only If set, dry run will be performed, during which the
 #'   run metrics will be gathered and returned for use of \code{metadata_dump}.
-#' @return Returns boolean. \code{TRUE} if success, and \code{FALSE} on failure.
+#' @return Returns updated metadata on success, and \code{NULL} on failure.
+
 load.objects.by.metadata<-function(
     metadata,
     metadata.path,
@@ -171,6 +173,14 @@ load.objects.by.metadata<-function(
     flag.force.recalculation<-FALSE
   else
     flag.force.recalculation<-metadata$flag.force.recalculation
+
+  if (!flag.force.recalculation )
+  {
+    code_changed<-code_has_been_changed(metadata)
+    if (identical(code_changed, TRUE))
+      flag.force.recalculation <- TRUE
+  }
+
   checkmate::assertPathForOutput(metadata.path, overwrite=TRUE)
   assertMetadata(metadata)
   for(n in objectnames)
@@ -207,7 +217,7 @@ load.objects.by.metadata<-function(
   {
     wait.for.lock(paste0(metadata.path,'.meta'), 120*60) #max 2 hours
     create.lock.file(paste0(metadata.path,'.meta'))
-    ans<-NULL
+    ans<-FALSE
   }
 
   if (!flag.force.recalculation)
@@ -244,7 +254,7 @@ load.objects.by.metadata<-function(
       else
       {
         release.lock.file(paste0(metadata.path,'.meta'))
-        return(TRUE)
+        return(metadata)
       }
     }
 
@@ -308,14 +318,24 @@ load.objects.by.metadata<-function(
       else
       {
         release.lock.file(paste0(metadata.path,'.meta'))
-        return(TRUE)
+        return(metadata)
       }
     }
   }
   tryCatch(
-    create.ans<-create.objects(metadata=metadata, metadata.path=metadata.path, objects.to.keep=objectnames, objectaliases=aliasnames,  flag.save.intermediate.objects=flag.save.intermediate.objects,flag.check.md5sum=flag.check.md5sum, flag.save.in.background=flag.save.in.background, estimation.only=ans),
-    finally=release.lock.file(paste0(metadata.path,'.meta'))
-  )
+    create.ans<-create.objects(metadata=metadata,
+                               metadata.path=metadata.path,
+                               objects.to.keep=objectnames,
+                               objectaliases=aliasnames,
+                               flag.save.intermediate.objects=flag.save.intermediate.objects,
+                               flag.check.md5sum=flag.check.md5sum,
+                               flag.save.in.background=flag.save.in.background,
+                               estimation.only=ans),
+    finally=release.lock.file(paste0(metadata.path,'.meta')))
+  if (is.null(create.ans))
+  {
+    return(NULL)
+  }
   if (flag.force.recalculation)
   {
     create.ans$flag.force.recalculation<-FALSE
@@ -335,14 +355,14 @@ get.objects.by.metadata<-function(
     flag.forget.parents=TRUE,
     flag.drop.list.if.one.object=TRUE)
 {
-  if (load.objects.by.metadata(
+  if (!is.null(load.objects.by.metadata(
           metadata=metadata,
           metadata.path=metadata.path,
           objectnames=objectnames,
           aliasnames = aliasnames,
           flag.save.intermediate.objects=flag.save.intermediate.objects,
           flag.check.md5sum=flag.check.md5sum,
-          flag.save.in.background=flag.save.in.background))
+          flag.save.in.background=flag.save.in.background)))
   {
     ans<-list()
     for (n in objectnames)

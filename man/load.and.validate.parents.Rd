@@ -12,7 +12,7 @@ load.and.validate.parents(metadata, flag.check.md5 = FALSE,
 
 \item{flag.check.md5}{This parameter gets forwarded to \code{load.object.from.disk}}
 
-\item{estimation.only}{If set, the function performs a dry run, with no parents get loaded,
+\item{estimation.only}{If not FALSE, the function performs a dry run, with no parents get loaded,
 but extra information gets returned.}
 }
 \value{

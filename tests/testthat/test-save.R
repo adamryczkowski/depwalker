@@ -13,7 +13,7 @@ test_that("Saving to non-existent directory", {
   {
     unlink(path)
   }
-  depwalker:::get.object(metadata=m)
+  depwalker:::get.object(metadata=m,flag.save.in.background = FALSE)
   if (!dir.exists(path))
   {
     stop("The directory was not created!")
@@ -48,7 +48,7 @@ test_that("Testing saving with default R compression", {
   m$objectrecords[[1]]$compress<-'gzip'
   depwalker:::make.sure.metadata.is.saved(m)
 #  debugonce(depwalker:::save.object)
-  if (!depwalker:::load.object(metadata=m, flag.save.in.background=FALSE))
+  if (is.null(depwalker:::load.object(metadata=m, flag.save.in.background=FALSE)))
     stop("Error executing gzip task")
   filesize<-file.size(file.path(tmpdir,'data.rds'))
   rm(data)

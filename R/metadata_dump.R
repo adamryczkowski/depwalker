@@ -224,7 +224,7 @@ metadata.one.dump<-function(metadata, id)
   }
   p<-dt
   m$parents<-NULL
-  m$codedigest<-calculate.code.digest(metadata = metadata)
+  m$codedigest<-calculate_code_digest(metadata = metadata)
   m$codepath<-get.codepath(metadata = metadata)
   m$code<-paste(m$code, collapse='\n')
 

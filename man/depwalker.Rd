@@ -78,7 +78,13 @@ executed.
       relative to the location of this file itself. The contents of the script is part of the task definition.}
 \item{\strong{extrasources}}{Optional dictionary with all the external files managed by the main R script.
       These may be source files
-      in other languages like C++, or CSV files with data. Dictionary key is case-sensitive base file name. }
+      in other languages like C++, or CSV files with data. Dictionary key is case-sensitive base file name.
+      These source files (written in any language) \emph{are expected to be invoked from within the
+      main script file (\code{codepath})} and will not be called automatically.
+      There are tracked for changes, and if any of the secondary source files changes,
+      the whole task will need to be re-run. }
+\item{codeCRC}{MD5 hash of all the source files - \code{codepath} and all files in \code{extrasources}, in
+     cannonical order.}
 \item{\strong{parents}}{Dictionary with all parent task definitions. Dictionary key is base name of the task. }
 \item{\strong{objectrecords}}{Dictionary with registered objects produced by the main R script.
       Dictionary key is the object name. }

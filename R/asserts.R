@@ -40,7 +40,7 @@ assertMetadata<-function(metadata)
   checkmate::assertList(metadata$objectrecords)
   checkmate::assertPathForOutput(metadata$path, overwrite=TRUE)
   if (!is.null(metadata$codepath))
-    checkmate::assertPathForOutput(get.codepath(metadata), overwrite=TRUE)
+    checkmate::assert_file_exists(get.codepath(metadata))
   a<-assertCode(metadata$code)
   if (a!='')
     stop(paste0('Invalid R code: ',a))
@@ -53,6 +53,12 @@ assertMetadata<-function(metadata)
   for (parentrecord in metadata$parents)
   {
     assertParentRecordMetadata(parentrecord, metadata)
+  }
+
+  if (!is.null(metadata$execution.directory))
+  {
+    path<-get.codepath(metadata, metadata$execution.directory)
+    assertValidPath(path)
   }
 
   checkmate::assertList(metadata$parents)
@@ -69,11 +75,26 @@ assertMetadata<-function(metadata)
     if (!all(cols %in% colnames(metadata$timecosts)))
       stop("Insufficient columns in metadata$timecosts data.frame")
   }
+  if (!is.null(metadata$extrasources))
+  {
+    for (extrasource in metadata$extrasources)
+    {
+      checkmate::assert_file_exists(get.codepath(metadata, extrasource$path))
+      checkmate::assert_flag(extrasource$flag.checksum)
+    }
+  }
+  if (!is.null(metadata$codeCRC))
+    assertDigest(metadata$codeCRC)
 }
 
 assertValidPath<-function(path)
 {
   checkmate::assertString(path, pattern= "[^\\0]+")
+}
+
+assertFileExists<-function(path)
+{
+  checkmate::assert_file_exists(path)
 }
 
 assertDigest<-function(digest)

@@ -154,7 +154,7 @@ unload.objects<-function(parentrecords)
 #'
 #' @param metadata Metadata for which we want to load all parents (dependencies)
 #' @param flag.check.md5 This parameter gets forwarded to \code{load.object.from.disk}
-#' @param estimation.only If set, the function performs a dry run, with no parents get loaded,
+#' @param estimation.only If not FALSE, the function performs a dry run, with no parents get loaded,
 #'    but extra information gets returned.
 #'
 #' @return If \code{estimation.only=NULL}, it returns boolean in which \code{TRUE} means success
@@ -173,7 +173,7 @@ load.and.validate.parents<-function(metadata, flag.check.md5=FALSE,estimation.on
 
   if (length(metadata$parents)==0)
   {
-    if(is.null(estimation.only))
+    if(is.logical(estimation.only))
       return(TRUE)
     else
       return(estimation.only)
@@ -188,7 +188,7 @@ load.and.validate.parents<-function(metadata, flag.check.md5=FALSE,estimation.on
     o<-get.objectrecords(m, po$names)
     parents.objects[[po$path]]<-list(metadata=m, objrec=o, names=po$names, aliasnames=po$aliasnames, metadata.path=po$path)
   }
-  if (!is.null(estimation.only))
+  if (!is.logical(estimation.only))
   {
     for(po in parents.objects)
     {
@@ -269,7 +269,7 @@ load.and.validate.parents<-function(metadata, flag.check.md5=FALSE,estimation.on
   {
     l=parents.objects[[idxs[i]]]
     ans<-load.objects.by.metadata(metadata=l$metadata, metadata.path=pathcat::path.cat(dirname(metadata$path), l$metadata.path), objectnames=l$names, aliasnames=l$aliasnames)
-    if (ans==FALSE)
+    if (is.logical(ans))
       return (FALSE) #We didn't manage to read
   }
 

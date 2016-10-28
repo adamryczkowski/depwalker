@@ -13,8 +13,7 @@
 #' @param estimation.only If \code{NULL} the function is run for its side effects. If not null, it makes no side effects
 #'   and instead it returns detailed trace of the computations it is going to perform. This information is gathered
 #'   by high-level function \code{metadata.dump}
-#' @return If \code{is.null(estiation.only)} it returns boolean, where \code{TRUE} means success,
-#' and \code{FALSE} means failure.
+#' @return If \code{is.null(estiation.only)} it returns either updated metadata on success or NULL on failre.
 #' Otherwise it returns updated run statistics
 create.objects<-function(
     metadata,
@@ -27,7 +26,7 @@ create.objects<-function(
     flag.forget.parents=TRUE,
     estimation.only=NULL)
 {
-  if (!is.null(estimation.only))
+  if (!is.logical(estimation.only))
   {
     assertTimeEstimation(estimation.only)
     flag.estimation.only=TRUE
@@ -70,7 +69,7 @@ create.objects<-function(
   } else
   {
     if (ans==FALSE)
-      return(FALSE)
+      return(NULL)
   }
 
   #Now we execute the script
@@ -81,7 +80,7 @@ create.objects<-function(
   } else {
     if (is.null(ans))
     {
-      return(FALSE)
+      return(NULL)
     }
   }
   metadata<-ans
@@ -172,5 +171,5 @@ create.objects<-function(
 
   if (flag.do.gc)
     gc()
-  TRUE
+  return(metadata)
 }
