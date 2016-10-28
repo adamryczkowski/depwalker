@@ -24,8 +24,11 @@ test_that("Testing for metadata.dump of complicated task with parents",{
     stop("Wrong number of rows in dump$objectrecords!")
   if (nrow(dump$parents)!=6)
     stop("Wrong number of rows in dump$parents!")
-  if (nrow(dump$timecosts)!=7)
+  if (nrow(dump$timecosts)<7)
+  {
+    print(dump$timecosts)
     stop("Wrong number of rows in dump$timecosts!")
+  }
 
 })
 

@@ -4,7 +4,8 @@
 \alias{create.metadata}
 \title{Creates task's metadata object.}
 \usage{
-create.metadata(code, metadata.path, flag.never.execute.parallel = FALSE)
+create.metadata(code, metadata.path, flag.never.execute.parallel = FALSE,
+  execution.directory = "")
 }
 \arguments{
 \item{code}{character vector with code. Each element of the vector will be treated as separate line.}

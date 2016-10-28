@@ -39,9 +39,15 @@ cpu.usage.list<-function()
 }
 
 # Returns full path to the code
-get.codepath<-function(metadata)
+#' @export
+get.codepath<-function(metadata, path=NULL)
 {
-  return(pathcat::path.cat(dirname(metadata$path), metadata$codepath))
+  if (is.null(path))
+  {
+    path <- metadata$codepath
+  }
+  path <- pathcat::path.cat(dirname(metadata$path), path)
+  return(path)
 }
 
 get.parentpath<-function(parentrecord, metadata=NULL, metadata.path=NULL, flag_include_extension=TRUE)
@@ -277,4 +283,11 @@ mytraceback<-function (x = NULL, max.lines = getOption("deparse.max.lines"))
     }
   }
   # invisible(x)
+}
+
+normalize_code_string<-function(code)
+{
+  code[code=='']<-'\n' #Otherwise empty rows will be removed from the string
+  code<-unlist(strsplit(code,'\n')) #Makes sure each line is in separate element
+  return(code)
 }

@@ -1,8 +1,12 @@
 # Dodaj "extrasources" składową do metadata, która zawiera dodatkową listę hashowanych plików, traktowanych na równi z kodem źródłowym z punktu widzenia liczenia zmiany zadania
-# Dokończ unit testy
 # Zmień zarządzanie wątkami - zamiast parallel, użyj czegoś bardziej zaawansowanego, co pozwala na zarządzanie obliczeniami. Pula równoległych potoków?
-# Do logu dodaj zajęcie pamięci (jeśl więcej niż jakiś próg; w stylu "+11.2 MB")
 # Niech każda funkcja przyjmuje argument "envir" określający environment w którym należy przechowywać obiekty
-# Upewnij się, że działa część Excelowa prawidłowo.
 # Zamień wszystkie kropki w nazwach funkcji na podkreślniki
-# Sprawdź, czy możesz prawidłowo działać na standardowym pakiecie evaluate
+OK # Upewnij się, że działa część Excelowa prawidłowo.
+# Do logu dodaj zajęcie pamięci (jeśl więcej niż jakiś próg; w stylu "+11.2 MB")
+OK # Sprawdź, czy możesz prawidłowo działać na standardowym pakiecie evaluate - nie, nie możesz, ale skontaktowałem się z autorem jeszcze raz.
+Ok # Dokończ unit testy
+# Dodaj readme.
+# Wykorzystaj podejście library(modules) - niech kod może być podany również jako R expression (a nie tylko jako string)
+# Dodaj crc kodu źródłowego
+# Daj możliwość więcej, niż jednego source file

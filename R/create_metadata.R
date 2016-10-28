@@ -9,16 +9,19 @@
 #'    \code{add.parent} and \code{add.object.record}
 #' @export
 #' @seealso \code{\link{add.parent}}, \code{\link{add.objectrecord}}
-create.metadata<-function(code, metadata.path, flag.never.execute.parallel=FALSE)
+create.metadata<-function(code, metadata.path, flag.never.execute.parallel=FALSE, execution.directory='')
 {
-  code<-unlist(strsplit(code,'\n')) #Makes sure each line is in separate element
+  code<-normalize_code_string(code)
   a<-assertCode(code)
   if (a!='')
     stop(paste0("Invalid code: ", a))
   checkmate::assertFlag(flag.never.execute.parallel)
   checkmate::assertPathForOutput(metadata.path, overwrite=TRUE)
 
-  metadata<-list(code=code, path=metadata.path, parents=list(), objectrecords=list(), flag.never.execute.parallel=flag.never.execute.parallel, flag.force.recalculation=FALSE)
+
+  metadata<-list(code=code, path=metadata.path, parents=list(), objectrecords=list(), flag.never.execute.parallel=flag.never.execute.parallel, flag.force.recalculation=FALSE, execution.directory=execution.directory)
+  codeCRC<-calculate_code_digest(metadata)
+  metadata$codeCRC<-codeCRC
   assertMetadata(metadata)
   return(metadata)
 }
@@ -139,3 +142,60 @@ add.objectrecord<-function(metadata, name, path=NULL, compress='xz')
   return(metadata)
 }
 
+
+#' Add additional source file to the task.
+#'
+#' @param metadata already created metadata you wish to add the source file to. You can create task's metadata from scratch with \code{\link{create.metadata}}.
+#' @param filepath Path to the file, if the file is already existing (it can be relative to the task's path)
+#' @param code Optional string with the contents of the file. If specified and the file does not already exist, the file will be created
+#'        with this contents.
+#' @return modified \code{metadata} argument that includes additional source file or NULL if error.
+#' @export
+#' @seealso \code{\link{create.metadata}}, \code{\link{add.parent}}
+#' @export
+add_source_file<-function(metadata, filepath, code=NULL, flag.checksum=TRUE)
+{
+  depwalker:::assertMetadata(metadata)
+  checkmate::assert_logical(flag.checksum)
+  filepath <- depwalker:::get.codepath(metadata, filepath)
+  checkmate::assertPathForOutput(filepath, overwrite=TRUE)
+  if (file.exists(filepath))
+  {
+    if (!is.null(code)) {
+      code<-normalize_code_string(code)
+      # Sprawdzamy, czy istniejący plik ma ten sam kod
+      existing_code<-readLines(filepath)
+      if (code != existing_code)
+      {
+        stop(paste0("The code file ", filepath, " already exists, but with different contents."))
+      }
+    }
+  } else {
+    if (is.null(code))
+    {
+      stop("You must either specify filepath to the already existing source file, or put the source code in the code parameter.")
+    }
+    code<-normalize_code_string(code)
+    writeLines(code, filepath)
+    message(paste0("Written ", length(code), " lines into ", filepath, "."))
+  }
+  metadata<-append_extra_code(metadata, filepath, flag.checksum)
+  return(metadata)
+}
+
+#' Function that appends file path to the metadata. It does no checking, it simply
+#' updates the data structure.
+append_extra_code<-function(metadata, filepath, flag.checksum)
+{
+  filepath=pathcat::make.path.relative(base.path =  dirname(metadata$path), target.path = filepath)
+
+  if (is.null(metadata$extrasources))
+  {
+    extrasources<-list()
+  } else {
+    extrasources<-metadata$extrasources
+  }
+  extrasources[filepath]<-list(list(path=filepath, flag.checksum=flag.checksum))
+  metadata$extrasources<-extrasources
+  return(metadata)
+}

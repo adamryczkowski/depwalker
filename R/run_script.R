@@ -42,7 +42,7 @@ capture.evaluate<-function(code, envir=.GlobalEnv)
 
 run.script<-function(metadata, objects.to.keep,estimation.only=NULL)
 {
-  if (!is.null(estimation.only))
+  if (!is.logical(estimation.only))
   {
     estimation.only$script.time<-script.time(metadata)
     return(estimation.only)
@@ -60,6 +60,11 @@ run.script<-function(metadata, objects.to.keep,estimation.only=NULL)
   gc()
   busycpus<-cpu.usage.list()$busy.cpus
   fmem<-memfree()
+  if (!is.null(metadata$execution.directory))
+  {
+    olddir<-getwd()
+    setwd(get.codepath(metadata, metadata$execution.directory))
+  }
   time<-as.numeric(system.time(
     out<-capture.evaluate(metadata$code, envir=.GlobalEnv)
   ))[1:3]
@@ -74,6 +79,10 @@ run.script<-function(metadata, objects.to.keep,estimation.only=NULL)
   }
   writeLines(out$output, con)
   close(con)
+  if (!is.null(metadata$execution.directory))
+  {
+    setwd(olddir)
+  }
   timecost<-list(walltime=bit64::as.integer64(time[3]*1000),
                  cputime=bit64::as.integer64(time[1]*1000),
                  systemtime=bit64::as.integer64(time[2]*1000),

@@ -36,7 +36,7 @@ stored in metadata. It will be used to further verify authenticity of the object
 \item{objectname}{Object to return.}
 }
 \value{
-\code{load.object} returns boolean. \code{TRUE} if success, and \code{FALSE} on failure.
+\code{load.object} returns updated metadata on success, and \code{NULL} on failure.
   \code{get.object} returns the object itself, if there is only one object to return,
   a named list of objects, if requested to return more than one object, or \code{NULL} on failure.
 }

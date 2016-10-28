@@ -35,7 +35,7 @@ stored in metadata. It will be used to further verify authenticity of the object
 run metrics will be gathered and returned for use of \code{metadata_dump}.}
 }
 \value{
-Returns boolean. \code{TRUE} if success, and \code{FALSE} on failure.
+Returns updated metadata on success, and \code{NULL} on failure.
 }
 \description{
 If \code{flag.estimate.only} is present, it returns the detailed execution tree and historic execution metrics

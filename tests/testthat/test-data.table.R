@@ -13,5 +13,5 @@ test_that("Execution of task, which outputs data.table", expect_true({
   m<-depwalker:::load.metadata(file.path(tmpdir, "task6"));
   if (exists('DT',envir=.GlobalEnv))
     rm('DT',envir=.GlobalEnv)
-  depwalker:::load.object(metadata=m, metadata.path=file.path(tmpdir, "task6"),flag.save.in.background = FALSE)
+  !is.null(depwalker:::load.object(metadata=m, metadata.path=file.path(tmpdir, "task6"),flag.save.in.background = FALSE))
 }))

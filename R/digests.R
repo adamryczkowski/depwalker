@@ -40,7 +40,7 @@ metadata.digest<-function(metadata)
   # 3) digestu z objects
 
   parents.digest<-parents.digest(metadata)
-  code.digest<-calculate.code.digest(metadata)
+  code.digest<-calculate_code_digest(metadata)
   objects.digest<-objects.digest(metadata)
 
   ans<-digest::digest(paste0(parents.digest,"><",code.digest, "><", objects.digest),serialize = FALSE)
@@ -56,20 +56,71 @@ metadata.digest<-function(metadata)
 #' If there is only one line of code it returns digest of it.
 #'
 #' @param metadata Metadata of the object
-calculate.code.digest<-function(metadata)
+calculate_code_digest<-function(metadata)
 {
-  if (length(metadata$code)>1)
+  files<-get_coding_files(metadata, flag_expand_paths = TRUE)
+  if (is.null(files))
+  {
+    digests<-calculate_one_digest(metadata$code)
+  } else {
+    digests<-plyr::aaply(files,1,source_file_digest)
+  }
+  if (length(digests)>1)
+  {
+    return(digest::digest(paste0(digests,collapse=''), serialize = FALSE))
+  } else {
+    return(digests)
+  }
+}
+
+#' Returns all files with code in canonical order:
+#' first the main file,
+#' then all the auxilary files sorted alphabetically including paths
+get_coding_files<-function(metadata, flag_expand_paths)
+{
+  if (!is.null(metadata$extrasources))
+  {
+    extranames<-plyr::laply(metadata$extrasources,function(s) s$path)
+    ans <- c(metadata$codepath, extranames[order(extranames)])
+  } else {
+    ans<-metadata$codepath
+  }
+
+  if (is.null(ans))
+    return(NULL)
+
+  if (flag_expand_paths)
+  {
+    ans <- plyr::aaply(ans, 1, function(path) pathcat::path.cat(dirname(metadata$path), path))
+  }
+
+  return(ans)
+
+}
+
+#' Calculated MD5 digest of a signle source file.
+#' I don't use tools::md5sum to make sure, that the digest is independent on newlines format (Windows/Linux)
+calculate_one_digest<-function(code)
+{
+  if (length(code)>1)
     codedigest<-digest::digest(
       do.call(
         paste0,
-        lapply(metadata$code,
+        lapply(code,
                function(x) digest::digest(x,algo='md5',serialize=FALSE,ascii=TRUE))),
       algo='md5',serialize=FALSE,ascii=TRUE)
   else
-    codedigest<-digest::digest(metadata$code, serialize=FALSE)
+    codedigest<-digest::digest(code, serialize=FALSE)
   assertDigest(codedigest)
   return(codedigest)
 }
+
+source_file_digest<-function(path)
+{
+  code<-readLines(path)
+  return(calculate_one_digest(code))
+}
+
 
 #' Returns object's digest for testing equivalence of metadataas
 #' Digest is solely based on names of the objects:
