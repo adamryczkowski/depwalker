@@ -1,4 +1,4 @@
-context("Correct logging of task execution")
+context("Error handling and logging")
 
 source('testfunctions.R')
 

@@ -1,4 +1,4 @@
-context("Correct logging of task execution")
+context("Correct dumping of task execution information")
 
 source('testfunctions.R')
 
@@ -18,17 +18,10 @@ test_that("Testing for metadata.dump of complicated task with parents",{
   obj<-depwalker:::get.object(metadata=m)
   dump<-depwalker:::metadata.dump(m$path)
 #  View(dump$objectrecords)
-  if (nrow(dump$metadata)!=7)
-    stop("Wrong number of rows in dump$metadata!")
-  if (nrow(dump$objectrecords)!=8)
-    stop("Wrong number of rows in dump$objectrecords!")
-  if (nrow(dump$parents)!=6)
-    stop("Wrong number of rows in dump$parents!")
-  if (nrow(dump$timecosts)<7)
-  {
-    print(dump$timecosts)
-    stop("Wrong number of rows in dump$timecosts!")
-  }
+  expect_equal(nrow(dump$metadata), 7)
+  expect_equal(nrow(dump$objectrecords),8)
+  expect_equal(nrow(dump$parents),6)
+  expect_gt(nrow(dump$timecosts),6)
 
 })
 

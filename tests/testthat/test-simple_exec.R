@@ -1,5 +1,7 @@
 context("Execution of simple task")
 
+source('testfunctions.R')
+
 test_that("Run simple task", expect_equal({
   testf1(tmpdir);
   m<-depwalker:::load.metadata(file.path(tmpdir, "task1"));
@@ -43,3 +45,16 @@ test_that("Execute simple task with multiple outputs", expect_equal({
                          objectname = "a2",
                          flag.save.in.background = FALSE)
 }, 23))
+
+test_that("Test for correct custom script directory", {
+  dir<-getwd()
+  fileloc<-file.path(tempdir(), 'file.txt')
+  if (file.exists(fileloc))
+  {
+    unlink(fileloc)
+  }
+  m<-testf15(tmpdir)
+  depwalker::load.object(metadata=m)
+  expect_equal(dir, getwd())
+  expect_true(file.exists(fileloc))
+})

@@ -158,3 +158,14 @@ testf14<-function(tmpdir)
 
   depwalker:::make.sure.metadata.is.saved(m);m
 }
+
+testf15<-function(tmpdir)
+{
+  #Task that creates a file in a current directory. Used to test for correct custom script directory
+  code<-c("writeLines('123','file.txt')", "x<-13")
+  tempdir()
+  m<-depwalker:::create.metadata(code, file.path(tmpdir,"task15"), execution.directory = tempdir())
+  m<-depwalker:::add.objectrecord(m,"x",file.path(tmpdir, "x"));
+
+  depwalker:::make.sure.metadata.is.saved(m);m
+}

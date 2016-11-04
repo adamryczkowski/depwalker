@@ -53,7 +53,9 @@ test_that("Testing 'unload.objects'", expect_true({
 
 test_that("Testing for parallel execution of parents", expect_equal({
   if (exists('ans'))
+  {
     rm(ans)
+  }
   unlink(file.path(tmpdir,'*.rds'))
   unlink(file.path(tmpdir,'pre_task*'))
 
@@ -64,7 +66,7 @@ test_that("Testing for parallel execution of parents", expect_equal({
 
   #Remove all traces of the computation
   if (exists('ans'))
-    rm(ans)
+    rm(ans, envir = .GlobalEnv)
   unlink(file.path(tmpdir,'*.rds'))
 
   #Run again - this time in parallel

@@ -41,8 +41,6 @@ test_that("Testing saving with pxz compression", {
 })
 
 test_that("Testing saving with default R compression", {
-  if (exists('data'))
-    rm(data)
   unlink(file.path(tmpdir,'*.rds'))
   m<-testf13(tmpdir)
   m$objectrecords[[1]]$compress<-'gzip'
@@ -51,7 +49,7 @@ test_that("Testing saving with default R compression", {
   if (is.null(depwalker:::load.object(metadata=m, flag.save.in.background=FALSE)))
     stop("Error executing gzip task")
   filesize<-file.size(file.path(tmpdir,'data.rds'))
-  rm(data)
+  rm(data, envir = .GlobalEnv)
   m$objectrecords[[1]]$compress<-'xz'
   depwalker:::make.sure.metadata.is.saved(m)
   unlink(file.path(tmpdir,'data.rds'))

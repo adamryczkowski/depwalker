@@ -8,7 +8,8 @@ test_that("External change to the main source code", {
   #  debugonce(depwalker:::join.metadatas)
   m<-depwalker:::make.sure.metadata.is.saved(m)
   depwalker:::get.object(metadata=m,flag.save.in.background = FALSE)
-  rm(x)
+  expect_true(exists('x', envir = .GlobalEnv))
+  rm(x, envir = .GlobalEnv)
 
   file<-depwalker::get.codepath(m)
   code<-'x<-5:15'
@@ -23,7 +24,8 @@ test_that("External change to the secondary source code", {
   #  debugonce(depwalker:::join.metadatas)
   m<-depwalker:::make.sure.metadata.is.saved(m)
   depwalker:::get.object(metadata=m,flag.save.in.background = FALSE)
-  rm(x)
+  expect_true(exists('x', envir = .GlobalEnv))
+  rm(x, envir = .GlobalEnv)
 
   file<-depwalker::get.codepath(m, path = 'aux.R')
   code<-'x<-43'
