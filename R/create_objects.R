@@ -103,30 +103,23 @@ create.objects<-function(
   #flag.save.in.background=TRUE
   if (flag.save.intermediate.objects)
   {
-    con<-list()
-    for(objectrecord in metadata$objectrecords)
+    if (flag.save.in.background)
+    { # nocov start
+      con<-tryCatch(
+        parallel::mcparallel(
+          save.objects(metadata=metadata,
+                       objectnames=NULL,
+                       flag.check.md5sum=flag.check.md5sum,
+                       flag.save.in.background=flag.save.in.background),
+          detached=TRUE),
+        error=function(e){class(e)<-'try-error';e})
+    } # nocov end
+    if (!flag.save.in.background || 'try-error' %in% attr(con,'class'))
     {
-      if (flag.save.in.background)
-      { # nocov start
-        con<-tryCatch(parallel::mcparallel(
-          {
-            save.object(metadata=metadata,
-                        objectrecord=objectrecord,
-                        flag.check.md5sum=flag.check.md5sum,
-                        flag.forget.object = TRUE) ;
-            1
-          },
-          paste0('save:',objectrecord$name),
-          detached=FALSE)
-        ,error=function(e){class(e)<-'try-error';e}) # nocov end
-        if ('try-error' %in% attr(con,'class'))
-        {
-          conname<-mangle.connection.name(path = pathcat::path.cat(dirname(metadata$path),objectrecord$path), objectname = objectrecord$name)
-          assign(conname,con,envir=.GlobalEnv)
-        }
-      }
-      if(!flag.save.in.background || 'try-error' %in% attr(con,'class'))
-        save.object(metadata=metadata, objectrecord=objectrecord,flag.check.md5sum=flag.check.md5sum)
+      save.objects(metadata=metadata,
+                   objectnames=NULL,
+                   flag.check.md5sum=flag.check.md5sum,
+                   flag.save.in.background=flag.save.in.background)
     }
   }
 

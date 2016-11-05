@@ -196,12 +196,11 @@ calculate.object.digest<-function(object)
 
   if (data.table::is.data.table(get(object, envir=.GlobalEnv)))
   {
-    d<-tryCatch(
-      eval(parse(text=paste0(object,'[,parallel::mclapply(.SD,function(x){gc();digest::digest(x,algo="md5")})]')),envir=.GlobalEnv),
+    d<-tryCatch(parallel::mclapply(get(object,envir = .GlobalEnv) , function(x) digest::digest(x, algo="md5")),
       error=function(e) e)
     if ('error' %in% class(d))
     {
-      d<-eval(parse(text=paste0(object,'[,lapply(.SD,function(x){gc();digest::digest(x,algo="md5")})]')),envir=.GlobalEnv)
+      d<-lapply(get(object,envir = .GlobalEnv) , function(x) digest::digest(x, algo="md5"))
     }
     d<-digest::digest(d[order(names(d))])
   } else {

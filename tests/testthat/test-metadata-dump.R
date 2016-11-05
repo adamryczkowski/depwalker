@@ -21,7 +21,7 @@ test_that("Testing for metadata.dump of complicated task with parents",{
   expect_equal(nrow(dump$metadata), 7)
   expect_equal(nrow(dump$objectrecords),8)
   expect_equal(nrow(dump$parents),6)
-  expect_gt(nrow(dump$timecosts),6)
+  expect_gt(nrow(dump$timecosts),5)
 
 })
 
