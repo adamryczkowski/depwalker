@@ -57,7 +57,7 @@ test_that("Test add extra parents", {
 test_that("Test add extra parents with conflict", expect_error({
   testf4(tmpdir);
   m<-depwalker:::load.metadata(file.path(tmpdir, "task4"));
-  m<-depwalker:::add.parent(metadata = m, name = 'bla',  metadata.path = file.path(tmpdir, "task10"), aliasname = 'a2')
+  m<-depwalker:::add.parent(metadata = m, name = 'bla',  parent.path = file.path(tmpdir, "task10"), aliasname = 'a2')
 }, regexp='^a2 is already present in parents of .*task4$'))
 
 test_that("Test task with multiple outputs", {
@@ -65,3 +65,4 @@ test_that("Test task with multiple outputs", {
   m2<-depwalker:::load.metadata(file.path(tmpdir, "task5"));
   expect_true(depwalker:::are.two.metadatas.equal(m,m2))
 })
+

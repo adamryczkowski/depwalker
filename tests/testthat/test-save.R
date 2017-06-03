@@ -57,3 +57,9 @@ test_that("Testing saving with default R compression", {
   filesize2<-file.size(file.path(tmpdir,'data.rds'))
   expect_true(filesize>filesize2)
 })
+
+test_that("Saving more than one object", {
+  #TODO:
+  #Save two objects at once with code that does some side-effect.
+  #Then see if they get loaded from a) memory, b) disk without the code being run
+})

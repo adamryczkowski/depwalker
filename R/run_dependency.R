@@ -77,6 +77,7 @@ load.object<-function(metadata.path=NULL,
 
 #' @export
 #' @describeIn load.object Gets the object by its metadata.
+#' If objectname is Null, then all objects get returned.
 get.object<-function(
     metadata.path=NULL,
     metadata=NULL,
@@ -84,7 +85,8 @@ get.object<-function(
     flag.save.intermediate.objects=TRUE,
     flag.check.md5sum=TRUE,
     flag.save.in.background=TRUE,
-    flag.check.object.digest=TRUE)
+    flag.check.object.digest=TRUE,
+    flag.return.list=FALSE)
 {
 
   if (!is.null(metadata.path))
@@ -129,7 +131,7 @@ get.object<-function(
     {
       ans[[o]]<-get(o, envir=.GlobalEnv)
     }
-    if (length(objectname)>1)
+    if (length(objectname)>1 || flag.return.list)
       return(ans)
     return(ans[[1]])
   }
@@ -177,8 +179,10 @@ load.objects.by.metadata<-function(
   if (!flag.force.recalculation )
   {
     code_changed<-code_has_been_changed(metadata)
-    if (identical(code_changed, TRUE))
+    if (!is.null(code_changed)){
       flag.force.recalculation <- TRUE
+      metadata<-code_changed
+    }
   }
 
   checkmate::assertPathForOutput(metadata.path, overwrite=TRUE)

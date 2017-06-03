@@ -65,6 +65,13 @@ calculate_code_digest<-function(metadata)
   } else {
     digests<-plyr::aaply(files,1,source_file_digest)
   }
+
+  files<-get_binary_files(metadata, flag_expand_paths = TRUE)
+  if (!is.null(files))
+  {
+    digests2<-plyr::aaply(files,1,tools::md5sum)
+    digests<-c(digests,digests2)
+  }
   if (length(digests)>1)
   {
     return(digest::digest(paste0(digests,collapse=''), serialize = FALSE))
@@ -80,8 +87,20 @@ get_coding_files<-function(metadata, flag_expand_paths)
 {
   if (!is.null(metadata$extrasources))
   {
-    extranames<-plyr::laply(metadata$extrasources,function(s) s$path)
-    ans <- c(metadata$codepath, extranames[order(extranames)])
+    extranames<-plyr::laply(metadata$extrasources,
+      function(s)
+        {
+          if (is.null(s$flag.binary)) #missing binary flag means the file is not binary
+            return(s$path)
+          if (!s$flag.binary)
+          {
+            return(s$path)
+          } else {
+            return('')
+          }
+        })
+    extranames2<-extranames[extranames!='']
+    ans <- c(metadata$codepath, extranames2[order(extranames2)])
   } else {
     ans<-metadata$codepath
   }
@@ -96,6 +115,37 @@ get_coding_files<-function(metadata, flag_expand_paths)
 
   return(ans)
 
+}
+
+#Gets the list of all binary files in their cannonical order
+get_binary_files<-function(metadata, flag_expand_paths)
+{
+  if (!is.null(metadata$extrasources))
+  {
+    extranames<-plyr::laply(metadata$extrasources,
+                            function(s)
+                            {
+                              if (is.null(s$flag.binary)) #missing binary flag means the file is not binary
+                                return('')
+                              if (s$flag.binary)
+                              {
+                                return(s$path)
+                              } else {
+                                return('')
+                              }
+                            })
+    extranames2<-extranames[extranames!='']
+    ans<-extranames2[order(extranames2)]
+  } else {
+    return(list())
+  }
+
+    if (flag_expand_paths)
+  {
+    ans <- plyr::aaply(ans, 1, function(path) pathcat::path.cat(dirname(metadata$path), path))
+  }
+
+  return(ans)
 }
 
 #' Calculated MD5 digest of a signle source file.

@@ -12,7 +12,7 @@ testf2<-function(tmpdir) {
   testf1(tmpdir);
   code<-"y<-sum(x)";
   m<-depwalker:::create.metadata(code, file.path(tmpdir, "task2"));
-  m<-depwalker:::add.parent(m, name = 'x',  file.path(tmpdir, "task1") );
+  m<-depwalker:::add.parent(metadata = m,  name = 'x',   parent.path = file.path(tmpdir, "task1") );
   m<-depwalker:::add.objectrecord(metadata=m, path=file.path(tmpdir, "y"), name="y");
   depwalker:::make.sure.metadata.is.saved(m);m
 }
@@ -22,8 +22,8 @@ testf3<-function(tmpdir)
   testf2(tmpdir);
   code<-"y3<-mean(inp)+y";
   m<-depwalker:::create.metadata(code, file.path(tmpdir, "task3"));
-  m<-depwalker:::add.parent(metadata = m, name = 'x',  metadata.path = file.path(tmpdir, "task1"),aliasname = 'inp' );
-  m<-depwalker:::add.parent(metadata = m, name = 'y',  metadata.path = file.path(tmpdir, "task2"));
+  m<-depwalker:::add.parent(metadata = m, name = 'x',  parent.path  = file.path(tmpdir, "task1"),aliasname = 'inp' );
+  m<-depwalker:::add.parent(metadata = m, name = 'y',  parent.path = file.path(tmpdir, "task2"));
   m<-depwalker:::add.objectrecord(metadata=m, path=file.path(tmpdir, "y3"), name="y3");
   depwalker:::make.sure.metadata.is.saved(m);m
 }
@@ -32,9 +32,9 @@ testf4<-function(tmpdir)
 {
   code<-"ans<-mean(a1,a2,y3)";
   m<-depwalker:::create.metadata(code, file.path(tmpdir, "task4"));
-  m<-depwalker:::add.parent(metadata = m, name = 'x',  metadata.path = file.path(tmpdir, "task1"),aliasname = 'a1' );
-  m<-depwalker:::add.parent(metadata = m, name = 'y3',  metadata.path = file.path(tmpdir, "task3"));
-  m<-depwalker:::add.parent(metadata = m, name = 'y',  metadata.path = file.path(tmpdir, "task2"), aliasname = 'a2');
+  m<-depwalker:::add.parent(metadata = m, name = 'x',  parent.path = file.path(tmpdir, "task1"),aliasname = 'a1' );
+  m<-depwalker:::add.parent(metadata = m, name = 'y3',  parent.path = file.path(tmpdir, "task3"));
+  m<-depwalker:::add.parent(metadata = m, name = 'y',  parent.path = file.path(tmpdir, "task2"), aliasname = 'a2');
   m<-depwalker:::add.objectrecord(metadata=m, path=file.path(tmpdir, "ans4"), name="ans");
   depwalker:::make.sure.metadata.is.saved(m);m
 }
@@ -69,11 +69,11 @@ testf7<-function(tmpdir)
   #Object with many parents
   m<-depwalker:::create.metadata('ans<-a1+a2+a3', file.path(tmpdir, "task7"))
   ma<-fncr('a1',1,1)
-  m<-depwalker:::add.parent(metadata=m, name='a1', metadata.path=ma$path);
+  m<-depwalker:::add.parent(metadata=m, name='a1', parent.path=ma$path);
   ma<-fncr('a2',10,2)
-  m<-depwalker:::add.parent(metadata=m, name='a2', metadata.path=ma$path);
+  m<-depwalker:::add.parent(metadata=m, name='a2', parent.path=ma$path);
   ma<-fncr('a3',100,3)
-  m<-depwalker:::add.parent(metadata=m, name='a3', metadata.path=ma$path);
+  m<-depwalker:::add.parent(metadata=m, name='a3', parent.path=ma$path);
   m<-depwalker:::add.objectrecord(metadata=m, name='ans')
   depwalker:::make.sure.metadata.is.saved(m)
   m
@@ -87,9 +87,9 @@ testf8<-function(tmpdir)
   m<-depwalker:::add.objectrecord(metadata=m, name='ans2')
 
   ma<-testf7(tmpdir)
-  m<-depwalker:::add.parent(metadata=m, metadata.path=ma$path, aliasname = 'f7');
+  m<-depwalker:::add.parent(metadata=m, parent.path=ma$path, aliasname = 'f7');
   ma<-testf2(tmpdir)
-  m<-depwalker:::add.parent(metadata=m, metadata.path=ma$path, aliasname = 'f2');
+  m<-depwalker:::add.parent(metadata=m, parent.path=ma$path, aliasname = 'f2');
   depwalker:::make.sure.metadata.is.saved(m)
   m
 }
@@ -149,8 +149,10 @@ testf13<-function(tmpdir)
 
 testf14<-function(tmpdir)
 {
-  #Task that has more than one source file
-  code<-"source('aux.R')"
+  #Task that has more than one source file and a side effect
+  folder<-tempdir()
+  code<-c(paste0("writeLines('123','", file.path(folder,'testf14.tmp'), "')"),
+          "source('aux.R')")
   m<-depwalker:::create.metadata(code, file.path(tmpdir,"task14"))
   m<-depwalker:::add.objectrecord(m,"x",file.path(tmpdir, "x"));
   m<-depwalker::add_source_file(m, 'aux.R', 'x<-42')
@@ -163,9 +165,40 @@ testf15<-function(tmpdir)
 {
   #Task that creates a file in a current directory. Used to test for correct custom script directory
   code<-c("writeLines('123','file.txt')", "x<-13")
-  tempdir()
   m<-depwalker:::create.metadata(code, file.path(tmpdir,"task15"), execution.directory = tempdir())
   m<-depwalker:::add.objectrecord(m,"x",file.path(tmpdir, "x"));
 
   depwalker:::make.sure.metadata.is.saved(m);m
+}
+
+testf16<-function(tmpdir)
+{
+  #Task that has more than one source file and a side effect
+  folder<-tempdir()
+  code<-"x<-digest::digest('../customdep.bin', algo='crc32', file=TRUE)"
+  m<-depwalker:::create.metadata(code, file.path(tmpdir,"task16"))
+  m<-depwalker:::add.objectrecord(m,"x",file.path(tmpdir, "x"));
+  towrite<-as.raw(rep(0,16384))
+  towrite[3673]<-as.raw(42)
+  sciezka<-file.path(folder,'customdep.bin')
+  writeBin(object=towrite,con=sciezka)
+
+  m<-depwalker::add_source_file(m, filepath = sciezka,flag.binary = TRUE)
+
+  depwalker:::make.sure.metadata.is.saved(m);m
+}
+
+testf17<-function(tmpdir)
+{
+  #Task with existing code
+  filename<-pathcat::path.cat(tmpdir, "existing_R_code.R")
+
+  fileConn<-file(filename)
+  writeLines(c("a<-rnorm(1000)","b<-mean(a)"), fileConn)
+  close(fileConn)
+
+  m<-depwalker:::create.metadata(metadata.path =  file.path(tmpdir,"task16"), source.path = filename)
+  m<-depwalker:::add.objectrecord(m,"b",file.path(tmpdir, "b"));
+  depwalker:::make.sure.metadata.is.saved(m);m
+
 }

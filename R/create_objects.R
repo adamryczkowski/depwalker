@@ -112,11 +112,12 @@ create.objects<-function(
                        flag.check.md5sum=flag.check.md5sum,
                        flag.save.in.background=flag.save.in.background),
           detached=TRUE),
-        error=function(e){class(e)<-'try-error';e})
-    } # nocov end
+        error=function(e){class(e)<-'try-error';e})  # nocov end
+      metadata<-load.metadata(metadata$path)
+    }
     if (!flag.save.in.background || 'try-error' %in% attr(con,'class'))
     {
-      save.objects(metadata=metadata,
+      metadata<-save.objects(metadata=metadata,
                    objectnames=NULL,
                    flag.check.md5sum=flag.check.md5sum,
                    flag.save.in.background=flag.save.in.background)

@@ -91,6 +91,8 @@
 #' \item{flag.checksum}{Flag. If set, contents of the file will be checksummed and on any change of the contents, the task
 #'       will be reexecuted. If cleared, only change of the filename will be considered when checking whether the cached
 #'       task results are valid.}
+#' \item{flag.binary}{Flag. If set, contents of the file will be treated as binary and checksummed as such. Otherwise they will be
+#'       checkusmmed like source files, line-by-line to avoid Linux/Mac/Windows end-of-line character confussion.}
 #' }
 #'
 #' \strong{Description of the \code{parentrecord} item}:

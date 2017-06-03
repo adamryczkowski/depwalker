@@ -24,7 +24,7 @@ cpu.usage<-function()
   pos<-which(a=='')
   a<-a[c(1, 3:(pos-1))]
   data <- data.table::fread(paste0(a,collapse='\n'))
-  data[,colnames(data)[1]:=NULL,with=FALSE]
+  data[,colnames(data)[1]:=NULL]
   #  print(data)
   return(data.table::as.data.table(data))
 }

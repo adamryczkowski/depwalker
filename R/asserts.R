@@ -81,6 +81,7 @@ assertMetadata<-function(metadata)
     {
       checkmate::assert_file_exists(get.codepath(metadata, extrasource$path))
       checkmate::assert_flag(extrasource$flag.checksum)
+      checkmate::assert_flag(extrasource$flag.binary)
     }
   }
   if (!is.null(metadata$codeCRC))

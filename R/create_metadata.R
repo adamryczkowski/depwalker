@@ -9,19 +9,41 @@
 #'    \code{add.parent} and \code{add.object.record}
 #' @export
 #' @seealso \code{\link{add.parent}}, \code{\link{add.objectrecord}}
-create.metadata<-function(code, metadata.path, flag.never.execute.parallel=FALSE, execution.directory='')
+create.metadata<-function(code=NULL, metadata.path, flag.never.execute.parallel=FALSE, execution.directory='', source.path=NULL)
 {
+  if(!is.null(code) && !is.null(source.path)) {
+    stop(paste0("You cannot give both code and source.path arguments!"))
+  }
+
+  if(is.null(code) && is.null(source.path)) {
+    stop(paste0("You must provide either code or source.path argument"))
+  }
+
+  checkmate::assertPathForOutput(metadata.path, overwrite=TRUE)
+  if(!is.null(source.path)) {
+    if(!file.exists(source.path)) {
+      stop(paste0("File under source.path ", source.path, " doesn't exist!"))
+    }
+    source.path <- pathcat::path.cat(dirname(metadata.path), source.path)
+    code<-readLines(source.path)
+    source.path <- pathcat::make.path.relative(dirname(metadata.path), source.path)
+  }
+
   code<-normalize_code_string(code)
   a<-assertCode(code)
   if (a!='')
     stop(paste0("Invalid code: ", a))
   checkmate::assertFlag(flag.never.execute.parallel)
-  checkmate::assertPathForOutput(metadata.path, overwrite=TRUE)
 
 
   metadata<-list(code=code, path=metadata.path, parents=list(), objectrecords=list(), flag.never.execute.parallel=flag.never.execute.parallel, flag.force.recalculation=FALSE, execution.directory=execution.directory)
   codeCRC<-calculate_code_digest(metadata)
   metadata$codeCRC<-codeCRC
+
+  if (!is.null(source.path)) {
+    metadata<-c(metadata, codepath=source.path)
+  }
+
   assertMetadata(metadata)
   return(metadata)
 }
@@ -43,17 +65,32 @@ create.metadata<-function(code, metadata.path, flag.never.execute.parallel=FALSE
 #' @return modified \code{metadata} argument that includes specified parent's record.
 #' @export
 #' @seealso \code{\link{create.metadata}}, \code{\link{add.objectrecord}}
-add.parent<-function(metadata, name=NULL, metadata.path, aliasname=NULL)
+add.parent<-function(metadata=NULL, name=NULL, parent.path=NULL,  parent=NULL, aliasname=NULL)
 {
-  assertValidPath(metadata.path)
   assertMetadata(metadata)
+  if(is.null(parent) && is.null(parent.path)){
+    stop("You must provide either parent or parent.path")
+  }
+
+  if(!is.null(parent)) {
+    assertMetadata(parent)
+    parent.path <- parent$path
+  }
+
+  if(!is.null(parent.path)) {
+    assertValidPath(parent.path)
+    parent<-load.metadata(parent.path)
+  }
+
+  if(!is.null(parent.path) && !is.null(parent)) {
+    if (parent$path != parent.path) {
+      stop(paste0("Ambivalent options encountered: parent.path (",parent.path,
+                  ") and the parent object, that points to the different directory: ", parent$path))
+    }
+  }
 
   if (is.null(name))
   {
-    parent<-load.metadata(metadata.path)
-    if (is.null(parent))
-      stop("Cannot find the parent")
-
     counts<-sum(plyr::laply(parent$objectrecords, function(or){names=or$name; return(length(names))}))
     if (counts==1)
       name<-paste0(parent$objectrecords[[1]]$name,collapse="; ")
@@ -83,7 +120,7 @@ add.parent<-function(metadata, name=NULL, metadata.path, aliasname=NULL)
   {
     stop(paste0(varname, " is already present in parents of ", metadata$path))
   }
-  path=pathcat::make.path.relative(base.path =  dirname(metadata$path), target.path = metadata.path)
+  path=pathcat::make.path.relative(base.path =  dirname(metadata$path), target.path = parent.path)
   parents[[path]]<-list(name=name, path=path, aliasname=aliasname)
   metadata$parents<-parents
 
@@ -149,11 +186,15 @@ add.objectrecord<-function(metadata, name, path=NULL, compress='xz')
 #' @param filepath Path to the file, if the file is already existing (it can be relative to the task's path)
 #' @param code Optional string with the contents of the file. If specified and the file does not already exist, the file will be created
 #'        with this contents.
+#' @param flag.binary If set, the file will be checksummed in binary mode rather than line-by-line. Checksumming line-by-line has the advantage of
+#'        being independent on a way the newline character is encoded into the file. When source is input as source string, the \code{flag.binary}
+#'        is automatically set to \code{FALSE}.
+#' @param flag.checksum If set (which is default), the file's contents will be examined to check for changes when evaluating freshness of this job.
 #' @return modified \code{metadata} argument that includes additional source file or NULL if error.
 #' @export
 #' @seealso \code{\link{create.metadata}}, \code{\link{add.parent}}
 #' @export
-add_source_file<-function(metadata, filepath, code=NULL, flag.checksum=TRUE)
+add_source_file<-function(metadata, filepath, code=NULL, flag.binary=FALSE, flag.checksum=TRUE)
 {
   depwalker:::assertMetadata(metadata)
   checkmate::assert_logical(flag.checksum)
@@ -178,14 +219,15 @@ add_source_file<-function(metadata, filepath, code=NULL, flag.checksum=TRUE)
     code<-normalize_code_string(code)
     writeLines(code, filepath)
     message(paste0("Written ", length(code), " lines into ", filepath, "."))
+    flag.binary=FALSE
   }
-  metadata<-append_extra_code(metadata, filepath, flag.checksum)
+  metadata<-append_extra_code(metadata, filepath, flag.checksum,flag.binary = flag.binary)
   return(metadata)
 }
 
 #' Function that appends file path to the metadata. It does no checking, it simply
 #' updates the data structure.
-append_extra_code<-function(metadata, filepath, flag.checksum)
+append_extra_code<-function(metadata, filepath, flag.checksum, flag.binary)
 {
   filepath=pathcat::make.path.relative(base.path =  dirname(metadata$path), target.path = filepath)
 
@@ -195,7 +237,7 @@ append_extra_code<-function(metadata, filepath, flag.checksum)
   } else {
     extrasources<-metadata$extrasources
   }
-  extrasources[filepath]<-list(list(path=filepath, flag.checksum=flag.checksum))
+  extrasources[filepath]<-list(list(path=filepath, flag.checksum=flag.checksum, flag.binary=flag.binary))
   metadata$extrasources<-extrasources
   return(metadata)
 }
