@@ -23,5 +23,5 @@ Imports:
 Depends:
     data.table,
     bit64
-RoxygenNote: 5.0.1
+RoxygenNote: 6.0.1
 Suggests: testthat

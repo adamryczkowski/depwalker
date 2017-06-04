@@ -64,7 +64,7 @@ load.object<-function(metadata.path=NULL,
     assertVariableNames(objectnames)
   }
 
-  load.objects.by.metadata(
+  ans<-load.objects.by.metadata(
     metadata=metadata,
     metadata.path=metadata.path,
     objectnames=objectnames,
@@ -73,6 +73,10 @@ load.object<-function(metadata.path=NULL,
     flag.check.md5sum=flag.check.md5sum,
     flag.save.in.background=flag.save.in.background,
     flag.check.object.digest=flag.check.object.digest)
+  if(is.null(ans)){
+    stop("Error during object execution")
+  }
+  return(ans)
 }
 
 #' @export
@@ -97,7 +101,7 @@ get.object<-function(
       assertMetadata(metadata)
       if (metadata$path != metadata.path)
       {
-        stop ("Ambiguosly aspecified metadata: metadata.path doesn't point to metadata object")
+        stop ("Ambiguosly specified metadata: metadata.path doesn't point to metadata object")
       }
     } else {
       metadata<-depwalker:::load.metadata(metadata.path)
@@ -203,6 +207,15 @@ load.objects.by.metadata<-function(
   checkmate::assertFlag(flag.check.object.digest)
 
   objrecs<-get.objectrecords(metadata, objectnames)
+  if (length(objrecs)< length(objectnames))
+  {
+    if(length(objectnames)==1) {
+      msg<-paste0("Cannot find object ", objectnames, " in the metadata ", metadata$path)
+    } else {
+      msg<-paste0("At least one of the following objects ", paste0(objectnames, collapse=", "), " is not exported in metadata ", metadata$path)
+    }
+    stop(msg)
+  }
   if (length(objrecs)==0)
   {
     if (flag.estimate.only)
