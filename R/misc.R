@@ -238,7 +238,7 @@ metadata.objects.size<-function(metadata)
 #     error = function(e) 0)
 # }
 
-#' Returns free memory. This function is strictly Linux-specific.
+#' Returns free memory in kB. This function is strictly Linux-specific.
 memfree<-function()
 {
   as.numeric(gsub(
