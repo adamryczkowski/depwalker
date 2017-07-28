@@ -122,7 +122,8 @@ add.parent<-function(metadata=NULL, name=NULL, parent.path=NULL,  parent=NULL, a
   {
     stop(paste0(varname, " is already present in parents of ", metadata$path))
   }
-  path=pathcat::make.path.relative(base.path =  dirname(metadata$path), target.path = parent.path)
+  path=pathcat::make.path.relative(base.path =  pathcat::path.cat(getwd(), dirname(metadata$path)),
+                                   target.path = pathcat::path.cat(getwd(), parent.path))
   parents[[path]]<-list(name=name, path=path, aliasname=aliasname)
   metadata$parents<-parents
 
@@ -172,7 +173,7 @@ add.objectrecord<-function(metadata, name, path=NULL, compress='xz')
     idx<-which(objectnames==name)
     objectrecords[idx]<-NULL
   }
-  path=pathcat::make.path.relative( base.path = dirname(metadata$path), target.path = path)
+  path=pathcat::make.path.relative( base.path = pathcat::path.cat(getwd(), dirname(metadata$path)), target.path = path)
 
   objectrecords[[name]]<-list(name=name, path=path, compress=compress)
   metadata$objectrecords<-objectrecords
