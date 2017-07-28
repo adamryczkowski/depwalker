@@ -49,10 +49,10 @@ run.script<-function(metadata, objects.to.keep,estimation.only=NULL)
   }
 
 
-  outfile=paste0(metadata$path,getOption('echo.extension'))
+  outfile=pathcat::path.cat(getwd(), paste0(metadata$path,getOption('echo.extension')))
   if (file.exists(outfile))
     unlink(outfile)
-  errfile=paste0(metadata$path,getOption('error.extension'))
+  errfile=pathcat::path.cat(getwd(), paste0(metadata$path,getOption('error.extension')))
   if (file.exists(errfile))
     unlink(errfile)
 
@@ -60,9 +60,9 @@ run.script<-function(metadata, objects.to.keep,estimation.only=NULL)
   gc()
   busycpus<-cpu.usage.list()$busy.cpus
   fmem<-memfree()
+  olddir<-getwd()
   if (!is.null(metadata$execution.directory))
   {
-    olddir<-getwd()
     setwd(get.codepath(metadata, metadata$execution.directory))
   }
   time<-as.numeric(system.time(

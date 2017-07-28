@@ -46,7 +46,7 @@ get.codepath<-function(metadata, path=NULL)
   {
     path <- metadata$codepath
   }
-  path <- pathcat::path.cat(dirname(metadata$path), path)
+  path <- pathcat::path.cat(getwd(), dirname(metadata$path), path)
   return(path)
 }
 

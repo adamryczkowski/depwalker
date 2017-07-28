@@ -88,6 +88,44 @@ save.object<-function(
   return(objectrecord)
 }
 
+#' Saves arbitrary large object to disk using saveRDS. If compression is 'xz', then
+#' the file is first saved quickly with no compression, and then the background
+#' process is spawned that compresses the file in multithreaded fassion using `pxz`,
+#' if the program is available.
+#'
+#'
+#' @param obj The object to be saved
+#' @param file Path to the file
+#' @param compress Compression method with the same meaning as saveRDS. Default is 'xz'.
+#' @param wait If set the function exits only after the object is available to read.
+#' @return Nothing.
+#' @export
+save.large.object<-function(obj, file, compress='xz', wait=FALSE) {
+  save_fn<-function(obj, file, compress) {
+    if (compress=='xz')
+    {
+      which_pxz<-suppressWarnings(system('which pxz', intern=TRUE))
+      if (length(which_pxz)>0)
+      {
+        #This trick with parallelizm trades 65% speedup of total execution time into 50% more total combined CPU time
+        saveRDS(obj,file=file,compress=FALSE)
+        system(paste0(which_pxz, ' "', file, '" -c -T 8 >"', file, '.tmp" && mv -f "', file, '.tmp" "', file,'"'), wait=FALSE)
+      } else
+      {
+        saveRDS(obj,file=file,compress=compress)
+      }
+    } else
+    {
+      saveRDS(obj,file=file,compress=compress)
+    }
+  }
+  if(wait) {
+    save_fn(obj=obj, file=file, compress=compress)
+  } else {
+    parallel::mcparallel(save_fn(obj=obj, file=file, compress=compress), detached = TRUE)
+  }
+}
+
 #' Saves all given objects to disk.
 #'
 #' It uses \code{save.object} function for saving, but tries to save all objects in parallel.

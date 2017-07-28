@@ -19,14 +19,16 @@ create.metadata<-function(code=NULL, metadata.path, flag.never.execute.parallel=
     stop(paste0("You must provide either code or source.path argument"))
   }
 
+  base_path <- pathcat::path.cat(getwd(),dirname(metadata.path))
+
   checkmate::assertPathForOutput(metadata.path, overwrite=TRUE)
   if(!is.null(source.path)) {
-    if(!file.exists(source.path)) {
-      stop(paste0("File under source.path ", source.path, " doesn't exist!"))
+    source.path <- pathcat::path.cat(base_path, source.path)
+    source.path <- pathcat::make.path.relative(base_path, source.path)
+    if(!file.exists(pathcat::path.cat(base_path, source.path))) {
+      stop(paste0("File under source.path ", pathcat::path.cat(base_path, source.path), " doesn't exist!"))
     }
-    source.path <- pathcat::path.cat(dirname(metadata.path), source.path)
-    code<-readLines(source.path)
-    source.path <- pathcat::make.path.relative(dirname(metadata.path), source.path)
+    code<-readLines(pathcat::path.cat(base_path, source.path))
   }
 
   code<-normalize_code_string(code)
@@ -170,7 +172,7 @@ add.objectrecord<-function(metadata, name, path=NULL, compress='xz')
     idx<-which(objectnames==name)
     objectrecords[idx]<-NULL
   }
-  path=pathcat::make.path.relative( base.path =  dirname(metadata$path), target.path = path)
+  path=pathcat::make.path.relative( base.path = dirname(metadata$path), target.path = path)
 
   objectrecords[[name]]<-list(name=name, path=path, compress=compress)
   metadata$objectrecords<-objectrecords
@@ -199,7 +201,7 @@ add_source_file<-function(metadata, filepath, code=NULL, flag.binary=FALSE, flag
   depwalker:::assertMetadata(metadata)
   checkmate::assert_logical(flag.checksum)
   filepath <- depwalker:::get.codepath(metadata, filepath)
-  checkmate::assertPathForOutput(filepath, overwrite=TRUE)
+  checkmate::assertPathForOutput(pathcat::path.cat(getwd(), dirname(metadata$path), filepath), overwrite=TRUE)
   if (file.exists(filepath))
   {
     if (!is.null(code)) {
@@ -229,7 +231,7 @@ add_source_file<-function(metadata, filepath, code=NULL, flag.binary=FALSE, flag
 #' updates the data structure.
 append_extra_code<-function(metadata, filepath, flag.checksum, flag.binary)
 {
-  filepath=pathcat::make.path.relative(base.path =  dirname(metadata$path), target.path = filepath)
+  filepath=pathcat::make.path.relative(base.path =  pathcat::path.cat(getwd(), dirname(metadata$path)), target.path = filepath)
 
   if (is.null(metadata$extrasources))
   {
