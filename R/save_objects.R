@@ -100,7 +100,7 @@ save.object<-function(
 #' @param wait If set the function exits only after the object is available to read.
 #' @return Nothing.
 #' @export
-save.large.object<-function(obj, file, compress='xz', wait=FALSE) {
+save.large.object<-function(obj, file, compress='xz', wait=FALSE, flag_use_tmp_storage=FALSE) {
   save_fn<-function(obj, file, compress) {
     if (compress=='xz')
     {
@@ -108,8 +108,18 @@ save.large.object<-function(obj, file, compress='xz', wait=FALSE) {
       if (length(which_pxz)>0)
       {
         #This trick with parallelizm trades 65% speedup of total execution time into 50% more total combined CPU time
-        saveRDS(obj,file=file,compress=FALSE)
-        system(paste0(which_pxz, ' "', file, '" -c -T 8 >"', file, '.tmp" && mv -f "', file, '.tmp" "', file,'"'), wait=FALSE)
+        if(flag_use_tmp_storage) {
+          filetmp=tempfile(fileext = '.rds')
+          pxz_wait=TRUE
+        } else {
+          filetmp=file
+          pxz_wait=FALSE
+        }
+        saveRDS(obj,file=filetmp,compress=FALSE)
+
+        system(paste0(
+          which_pxz, ' "', filetmp, '" -c -T 8 >"', filetmp,
+          '.tmp" && mv -f "', filetmp, '.tmp" "', file,'"'), wait=pxz_wait)
       } else
       {
         saveRDS(obj,file=file,compress=compress)
