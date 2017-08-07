@@ -2,7 +2,7 @@ context("Correct hanlding of concurrent writes/saves")
 
 source('testfunctions.R')
 
-test_that("Saving to non-existent directory", {
+test_that("Saving to non-existent directory (1)", {
   m<-testf1(tmpdir)
   m$objectrecords[[1]]$path<-'out/x'
 #  debugonce(depwalker:::make.sure.metadata.is.saved)
@@ -22,7 +22,7 @@ test_that("Saving to non-existent directory", {
   testthat::expect_equal(sum(a), 55)
 })
 
-test_that("Testing saving with pxz compression", {
+test_that("Testing saving with pxz compression (1)", {
   m<-testf1(tmpdir)
   m$objectrecords[[1]]$compress<-'xz'
   depwalker:::make.sure.metadata.is.saved(m)
@@ -40,7 +40,7 @@ test_that("Testing saving with pxz compression", {
   testthat::expect_equal(sum(a), 55)
 })
 
-test_that("Testing saving with default R compression", {
+test_that("Testing saving with default R compression (13)", {
   unlink(file.path(tmpdir,'*.rds'))
   m<-testf13(tmpdir)
   m$objectrecords[[1]]$compress<-'gzip'

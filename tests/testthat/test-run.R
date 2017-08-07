@@ -2,10 +2,10 @@ context("Error handling and logging")
 
 source('testfunctions.R')
 
-test_that("Testing for handling error during code execution", {
+test_that("Testing for handling error during code execution (9)", {
   testf9(tmpdir)
   m<-depwalker:::load.metadata(file.path(tmpdir, "task9"));
-  depwalker:::load.object(metadata = m)
+  testthat::expect_error(depwalker:::load.object(metadata = m), regexp = 'Error during object execution')
 
   path<-file.path(tmpdir,'task9.err.log')
 
@@ -22,7 +22,7 @@ test_that("Testing for handling error during code execution", {
 
 })
 
-test_that("Testing for handling warning during code execution", {
+test_that("Testing for handling warning during code execution (10)", {
   testf10(tmpdir)
   m<-depwalker:::load.metadata(file.path(tmpdir, "task10"));
   depwalker::load.object(metadata = m)
@@ -42,7 +42,7 @@ test_that("Testing for handling warning during code execution", {
 
 })
 
-test_that("Testing for handling messages during code execution", {
+test_that("Testing for handling messages during code execution (11)", {
   testf11(tmpdir)
   m<-depwalker:::load.metadata(file.path(tmpdir, "task11"));
   depwalker::load.object(metadata = m)
@@ -62,7 +62,7 @@ test_that("Testing for handling messages during code execution", {
 
 })
 
-test_that("Testing for handling nested error with traceback during code execution", {
+test_that("Testing for handling nested error with traceback during code execution (12)", {
   testf12(tmpdir)
   m<-depwalker:::load.metadata(file.path(tmpdir, "task12"));
   depwalker::load.object(metadata = m)

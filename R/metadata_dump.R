@@ -87,7 +87,7 @@
 #'    Memory fragmentation, leakage, and resulting object sizes all contribute to this memory}
 #' }
 #' @export
-metadata.dump<-function(metadata.path, id=NULL)
+metadata.dump<-function(metadata.path, id=NULL, flag.ignore.mtime=FALSE)
 {
   if (is.null(id))
     id<-as.integer(1)
@@ -95,7 +95,7 @@ metadata.dump<-function(metadata.path, id=NULL)
   m<-load.metadata(metadata.path)
   if (is.null(m))
     stop(paste0("No metadata found in ", metadata.path))
-  base<-metadata.one.dump(m, myid)
+  base<-metadata.one.dump(m, myid, flag.ignore.mtime=flag.ignore.mtime)
   for(i in seq(along.with=m$parents))
   {
     myid<-myid+1
@@ -123,7 +123,7 @@ join.metadata.dumps<-function(dump1, dump2)
   return(ans)
 }
 
-metadata.one.dump<-function(metadata, id)
+metadata.one.dump<-function(metadata, id, flag.ignore.mtime)
 {
   m<-metadata
   f1<-file.exists(get.codepath(metadata))
@@ -164,7 +164,7 @@ metadata.one.dump<-function(metadata, id)
       f1<-take.object.from.memory(o, flag.dry.run=TRUE)
       f2<-file.exists(paste0(get.objectpath(objectrecord = o, metadata = metadata), getOption('object.save.extension')))
       if (f2)
-        f4<-load.object.from.disk(metadata=metadata, objectrecord = o, flag.dont.load = TRUE )=='OK'
+        f4<-load.object.from.disk(metadata=metadata, objectrecord = o, flag.dont.load = TRUE, flag.ignore.mtime=flag.ignore.mtime )=='OK'
       else
         f4<-FALSE
       o$flags<-f1*1+f2*2+f4*4

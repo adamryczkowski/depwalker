@@ -76,7 +76,8 @@ take.object.from.memory<-function(objectrecord, aliasname=NULL, flag.check.objec
 #' @return Character string that describes the reason, why the object could not be loaded, or
 #'   'OK' string to indicate that the object was or can be loaded.
 #'
-load.object.from.disk<-function(metadata, objectrecord, aliasname=NULL, flag.dont.load=FALSE, flag.check.md5=TRUE)
+load.object.from.disk<-function(metadata, objectrecord, aliasname=NULL, flag.dont.load=FALSE, flag.check.md5=TRUE,
+                                flag.ignore.mtime=FALSE)
 {
   checkmate::assertFlag(flag.dont.load)
   checkmate::assertFlag(flag.check.md5)
@@ -102,8 +103,10 @@ load.object.from.disk<-function(metadata, objectrecord, aliasname=NULL, flag.don
   if (objectrecord$filesize != bit64::as.integer64(file.info(rds.filename)$size))
     return('File size mismatch')
 
-  if (abs(as.POSIXct(objectrecord$mtime) - file.mtime(rds.filename))>1)
-    return('MTime mismatch')
+  if(!flag.ignore.mtime) {
+    if (abs(as.POSIXct(objectrecord$mtime) - file.mtime(rds.filename))>1)
+      return('MTime mismatch')
+  }
 
   #Then we check, if the digest is valid
   if (flag.check.md5 && !is.null(objectrecord$filedigest) )
@@ -162,7 +165,8 @@ unload.objects<-function(parentrecords)
 #'
 #'   If \code{estimation.only!=NULL} it returns list used by \code{metadata_dump}
 #'
-load.and.validate.parents<-function(metadata, flag.check.md5=FALSE,estimation.only=NULL)  #FALSE jeśli się nie uda
+load.and.validate.parents<-function(metadata, flag.check.md5=FALSE,estimation.only=NULL,
+                                    flag.ignore.mtime=FALSE)  #FALSE jeśli się nie uda
 {
   checkmate::assertFlag(flag.check.md5)
   assertMetadata(metadata)
@@ -193,7 +197,7 @@ load.and.validate.parents<-function(metadata, flag.check.md5=FALSE,estimation.on
     for(po in parents.objects)
     {
       objrec=po$objrec
-      estimation.only$parents[po$path]<-load.objects.by.metadata(metadata=po$metadata, metadata.path=po$metadata.path,  objectnames = po$names, aliasnames=po$aliasnames, flag.estimate.only = TRUE )
+      estimation.only$parents[po$path]<-load.objects.by.metadata(metadata=po$metadata, metadata.path=po$metadata.path,  objectnames = po$names, aliasnames=po$aliasnames, flag.estimate.only = TRUE, flag.ignore.mtime=flag.ignore.mtime )
     }
     return(estimation.only)
   }
@@ -228,7 +232,7 @@ load.and.validate.parents<-function(metadata, flag.check.md5=FALSE,estimation.on
       return(FALSE)
     for(objrec in objrecs)
     {
-      if (load.object.from.disk(metadata=metadata,objectrecord =  objrec,  flag.dont.load = TRUE, flag.check.md5=flag.check.md5 )=='OK')
+      if (load.object.from.disk(metadata=metadata,objectrecord =  objrec,  flag.dont.load = TRUE, flag.check.md5=flag.check.md5, flag.ignore.mtime =  flag.ignore.mtime)=='OK')
         return(FALSE) #We don't parallelize simple reading from disk
     }
     # load.time<-metadata$filesize * object.load.speed
@@ -256,7 +260,11 @@ load.and.validate.parents<-function(metadata, flag.check.md5=FALSE,estimation.on
         #We don't translate object names into aliases, because the calculated objects
         #will not be used there
         #browser()
-        contexts[[i]]<-parallel::mcparallel(get.objects.by.metadata(metadata=l$metadata, metadata.path=l$metadata.path, objectnames=l$names, flag.drop.list.if.one.object=FALSE))
+        contexts[[i]]<-parallel::mcparallel(get.objects.by.metadata(metadata=l$metadata,
+                                                                    metadata.path=l$metadata.path,
+                                                                    objectnames=l$names,
+                                                                    flag.drop.list.if.one.object=FALSE,
+                                                                    flag.ignore.mtime=flag.ignore.mtime))
       }
     }
   } else

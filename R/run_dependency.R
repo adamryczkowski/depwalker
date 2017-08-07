@@ -34,6 +34,7 @@ load.object<-function(metadata.path=NULL,
                       objectnames=NULL,
                       flag.save.intermediate.objects=TRUE,
                       flag.check.md5sum=TRUE,
+                      flag.ignore.mtime=FALSE,
                       flag.save.in.background=TRUE, flag.check.object.digest=TRUE)
 {
 
@@ -72,6 +73,7 @@ load.object<-function(metadata.path=NULL,
     flag.save.intermediate.objects=flag.save.intermediate.objects,
     flag.check.md5sum=flag.check.md5sum,
     flag.save.in.background=flag.save.in.background,
+    flag.ignore.mtime = flag.ignore.mtime,
     flag.check.object.digest=flag.check.object.digest)
   if(is.null(ans)){
     stop("Error during object execution")
@@ -90,6 +92,7 @@ get.object<-function(
     flag.check.md5sum=TRUE,
     flag.save.in.background=TRUE,
     flag.check.object.digest=TRUE,
+    flag.ignore.mtime=FALSE,
     flag.return.list=FALSE)
 {
 
@@ -127,6 +130,7 @@ get.object<-function(
     objectnames=objectname,
     flag.save.intermediate.objects=flag.save.intermediate.objects,
     flag.save.in.background=flag.save.in.background,
+    flag.ignore.mtime = flag.ignore.mtime,
     flag.check.object.digest=flag.check.object.digest)
   if (!is.null(ans))
   {
@@ -173,6 +177,7 @@ load.objects.by.metadata<-function(
     flag.check.md5sum=TRUE,
     flag.save.in.background=TRUE,
     flag.check.object.digest=TRUE,
+    flag.ignore.mtime=FALSE,
     flag.estimate.only=FALSE) #True oznacza, że się udało
 {
   if (is.null(metadata$flag.force.recalculation))
@@ -301,7 +306,7 @@ load.objects.by.metadata<-function(
       if (is.na(diskobjects[i]))
       {
         tryCatch(
-          diskobjects[i]<-load.object.from.disk(metadata=metadata, objectrecord = objrec,  aliasname = aliasname, flag.dont.load = flag.estimate.only, flag.check.md5 = flag.check.md5sum)=='OK',
+          diskobjects[i]<-load.object.from.disk(metadata=metadata, objectrecord = objrec,  aliasname = aliasname, flag.dont.load = flag.estimate.only, flag.check.md5 = flag.check.md5sum, flag.ignore.mtime=flag.ignore.mtime)=='OK',
           error = function(e) release.lock.file(paste0(metadata.path,'.meta'))
         )
       }
@@ -370,6 +375,7 @@ get.objects.by.metadata<-function(
     flag.check.md5sum=FALSE,
     flag.save.in.background=TRUE,
     flag.forget.parents=TRUE,
+    flag.ignore.mtime=FALSE,
     flag.drop.list.if.one.object=TRUE)
 {
   if (!is.null(load.objects.by.metadata(
@@ -379,6 +385,7 @@ get.objects.by.metadata<-function(
           aliasnames = aliasnames,
           flag.save.intermediate.objects=flag.save.intermediate.objects,
           flag.check.md5sum=flag.check.md5sum,
+          flag.ignore.mtime = flag.ignore.mtime,
           flag.save.in.background=flag.save.in.background)))
   {
     ans<-list()

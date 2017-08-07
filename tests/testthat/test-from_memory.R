@@ -2,7 +2,7 @@ context("Load tasks from memory")
 
 source('testfunctions.R')
 
-test_that("Test getting task from R memory", expect_equal({
+test_that("Test getting task from R memory (1)", expect_equal({
   testf1(tmpdir);
   m<-depwalker:::load.metadata(file.path(tmpdir, "task1"));
   if (exists('x',envir=.GlobalEnv))
@@ -11,7 +11,7 @@ test_that("Test getting task from R memory", expect_equal({
   depwalker:::get.object(metadata=m, metadata.path=file.path(tmpdir, "task1"), objectname="x")
 }, 1:10))
 
-test_that("Test getting task from R memory without CRC", expect_equal({
+test_that("Test getting task from R memory without CRC (1)", expect_equal({
   testf1(tmpdir);
   m<-depwalker:::load.metadata(file.path(tmpdir, "task1"));
   if (exists('x',envir=.GlobalEnv))

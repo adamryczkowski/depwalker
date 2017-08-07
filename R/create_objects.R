@@ -24,6 +24,7 @@ create.objects<-function(
     flag.check.md5sum=TRUE,
     flag.save.in.background=TRUE,
     flag.forget.parents=TRUE,
+    flag.ignore.mtime=FALSE,
     estimation.only=NULL)
 {
   if (!is.logical(estimation.only))
@@ -58,7 +59,8 @@ create.objects<-function(
     stop(paste0("Objects ", objects.to.keep[!matches], " are not defined by metadata ", metadata$path))
 
   #First we load all ancestors
-  ans<-load.and.validate.parents(metadata, flag.check.md5sum, estimation.only=estimation.only)
+  ans<-load.and.validate.parents(metadata, flag.check.md5sum, estimation.only=estimation.only,
+                                 flag.ignore.mtime=flag.ignore.mtime)
 
   if (flag.estimation.only)
   {

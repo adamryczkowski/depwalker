@@ -197,8 +197,18 @@ testf17<-function(tmpdir)
   writeLines(c("a<-rnorm(1000)","b<-mean(a)"), fileConn)
   close(fileConn)
 
-  m<-depwalker:::create.metadata(metadata.path =  file.path(tmpdir,"task16"), source.path = filename)
+  m<-depwalker:::create.metadata(metadata.path =  file.path(tmpdir,"task17"), source.path = filename)
   m<-depwalker:::add.objectrecord(m,"b",file.path(tmpdir, "b"));
   depwalker:::make.sure.metadata.is.saved(m);m
 
+}
+
+testf18<-function(tmpdir)
+{
+  #Simple test with a side effect
+  filename<-pathcat::path.cat(tmpdir, "existing_R_code.R")
+  code<-"fileConn<-file('test18_side_effect.txt');writeLines(c('Hello World'), fileConn);close(fileConn);Sys.sleep(1);a<-1";
+  m<-depwalker:::create.metadata(code, file.path(tmpdir,"task18"))
+  m<-depwalker:::add.objectrecord(m,"a",file.path(tmpdir, "a"));
+  depwalker:::make.sure.metadata.is.saved(m);m
 }

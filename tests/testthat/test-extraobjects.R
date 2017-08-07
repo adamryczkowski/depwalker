@@ -2,7 +2,7 @@ context("Correct handling of external changes to the source codes")
 
 source('testfunctions.R')
 
-test_that("External change to the main source code", {
+test_that("External change to the main source code (1)", {
   m<-testf1(tmpdir)
   #  debugonce(depwalker:::make.sure.metadata.is.saved)
   #  debugonce(depwalker:::join.metadatas)
@@ -18,7 +18,7 @@ test_that("External change to the main source code", {
   expect_equal(x,5:15)
 })
 
-test_that("External change to the secondary source code and update of the test and cache afterwards", {
+test_that("External change to the secondary source code and update of the test and cache afterwards (14)", {
   tmpfile =  file.path(tempdir(), 'testf14.tmp')
 
   unlink(tmpfile)
@@ -51,7 +51,7 @@ test_that("External change to the secondary source code and update of the test a
 
 })
 
-test_that("External change to the secondary binary code and update of the test and cache afterwards", {
+test_that("External change to the secondary binary code and update of the test and cache afterwards (16)", {
   tmpfile =  file.path(tempdir(), 'customdep.bin')
 
   unlink(tmpfile)
