@@ -98,41 +98,87 @@ save.object<-function(
 #' @param file Path to the file
 #' @param compress Compression method with the same meaning as saveRDS. Default is 'xz'.
 #' @param wait If set the function exits only after the object is available to read.
-#' @return Nothing.
+#' @param fn_to_run_afters_save Function that will be run after save. The function will get a single argument - path to the
+#' newly created file
+#' @param flag_return_job
+#' @return parallel job with the backgroud save, if flag_return_job is set
 #' @export
-save.large.object<-function(obj, file, compress='xz', wait=FALSE, flag_use_tmp_storage=FALSE) {
-  save_fn<-function(obj, file, compress) {
+save.large.object<-function(obj, file, compress='xz', wait=FALSE, flag_use_tmp_storage=FALSE, fn_to_run_after_save=NULL,
+                            fn_to_run_after_compress, flag_return_job=FALSE) {
+  #Stage2 jest wykonywany w tle nawet wtedy, gdy wait=TRUE. Nie będzie wykonany tylko wtedy, gdy compress=FALSE
+  save_fn_stage2<-function(obj, file_from, file_to, compress, fn_to_run_after_compress) {
+    pxz_wait <- flag_return_job || is.null(fn_to_run_after_save)
     if (compress=='xz')
     {
       which_pxz<-suppressWarnings(system('which pxz', intern=TRUE))
       if (length(which_pxz)>0)
       {
-        #This trick with parallelizm trades 65% speedup of total execution time into 50% more total combined CPU time
-        if(flag_use_tmp_storage) {
-          filetmp=tempfile(fileext = '.rds')
-          pxz_wait=TRUE
-        } else {
-          filetmp=file
-          pxz_wait=FALSE
-        }
-        saveRDS(obj,file=filetmp,compress=FALSE)
 
-        system(paste0(
-          which_pxz, ' "', filetmp, '" -c -T 8 >"', filetmp,
-          '.tmp" && mv -f "', filetmp, '.tmp" "', file,'"'), wait=pxz_wait)
+        if(file_from != file_to) {
+          system(paste0(
+            which_pxz, ' "', file_from, '" -c -T 8 >"', file_to,
+            '.tmp" && mv -f "', file_to, '.tmp" "', file_to,'" && rm "', file_from, '"'), wait=pxz_wait)
+        } else {
+          system(paste0(
+            which_pxz, ' "', file_from, '" -c -T 8 >"', file_to,
+            '.tmp" && mv -f "', file_to, '.tmp" "', file_to,'"'), wait=pxz_wait)
+        }
       } else
       {
-        saveRDS(obj,file=file,compress=compress)
+        saveRDS(obj,file=file_to,compress=compress)
       }
     } else
     {
-      saveRDS(obj,file=file,compress=compress)
+      saveRDS(obj,file=file_to,compress=compress)
+    }
+    if(!is.null(fn_to_run_after_compress)){
+      fn_to_run_after_compress(file_to)
     }
   }
+
+
+  #Funkcja zapisuje plik na szybko, aby jaknajszybciej oddać sterowanie.
+  #Funkcja może być użyta tylko wtedy, gdy nie używamy flag_use_tmp_storage i wait=FALSE
+  save_fn_stage1<-function(obj, file, fn_to_run_after_save, flag_use_tmp_storage, flag_return_job,
+                           stage2fn, compress, fn_to_run_after_compress) {
+    if(flag_use_tmp_storage){
+      filetmp=tempfile(fileext = '.rds')
+    } else {
+      filetmp=file
+    }
+    saveRDS(obj, filetmp, compress = FALSE)
+    if(!is.null(fn_to_run_after_save)){
+      fn_to_run_after_save(file)
+    }
+
+    if(compress!=FALSE){
+      job<-parallel::mcparallel(
+        stage2fn(obj, file_from=filetmp, file_to=file, compress=compress, fn_to_run_after_compress=fn_to_run_after_compress),
+        detached=!flag_return_job)
+    } else {
+      if(!is.null(fn_to_run_after_compress)){
+        fn_to_run_after_compress(file)
+      }
+    }
+    return(jobs)
+  }
+
+
   if(wait) {
-    save_fn(obj=obj, file=file, compress=compress)
+    job<-save_fn_stage1(obj=obj, file=file, fn_to_run_after_save = fn_to_run_after_save,
+                        flag_use_tmp_storage = flag_use_tmp_storage, flag_return_job = flag_return_job,
+                        stage2fn = save_fn_stage2, fn_to_run_after_compress=fn_to_run_after_compress, compress = compress)
   } else {
-    parallel::mcparallel(save_fn(obj=obj, file=file, compress=compress), detached = TRUE)
+    parallel::mcparallel(
+      save_fn_stage1(obj=obj, file=file, fn_to_run_after_save = fn_to_run_after_save,
+                     flag_use_tmp_storage = flag_use_tmp_storage, flag_return_job = flag_return_job,
+                     stage2fn = save_fn_stage2, fn_to_run_after_compress=fn_to_run_after_compress, compress = compress),
+      detached = TRUE)
+  }
+  if(flag_return_job) {
+    return(jobs)
+  } else {
+    return(NULL)
   }
 }
 
