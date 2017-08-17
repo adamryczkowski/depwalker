@@ -160,7 +160,7 @@ save.large.object<-function(obj, file, compress='xz', wait=FALSE, flag_use_tmp_s
         fn_to_run_after_compress(file)
       }
     }
-    return(jobs)
+    return(job)
   }
 
 
