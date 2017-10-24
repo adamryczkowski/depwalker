@@ -96,7 +96,7 @@ run.script<-function(metadata, objects.to.keep,estimation.only=NULL)
   else
     metadata$timecosts<-rbind(metadata$timecosts, timecost)
   vars.after<-ls(envir=.GlobalEnv, all.names = TRUE)
-  vars.to.delete<-setdiff(vars.after, vars.before)
+  vars.to.delete<-setdiff(setdiff(vars.after, vars.before), objects.to.keep)
   if (length(vars.to.delete)>0)
     rm(list=vars.to.delete, envir=.GlobalEnv)
 
