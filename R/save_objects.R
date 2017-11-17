@@ -144,7 +144,7 @@ save.large.object<-function(obj, file, compress='xz', wait=FALSE, flag_use_tmp_s
   #Funkcja zapisuje plik na szybko, aby jaknajszybciej oddać sterowanie.
   #Funkcja może być użyta tylko wtedy, gdy nie używamy flag_use_tmp_storage i wait=FALSE
   save_fn_stage1<-function(obj, file, fn_to_run_after_save, flag_use_tmp_storage, flag_return_job,
-                           stage2fn, compress, fn_to_run_after_compress) {
+                           stage2fn, compress, fn_to_run_after_compress, parallel_cpus) {
     if(flag_use_tmp_storage){
       filetmp=tempfile(fileext = '.rds')
     } else {
@@ -157,7 +157,7 @@ save.large.object<-function(obj, file, compress='xz', wait=FALSE, flag_use_tmp_s
 
     if(compress!=FALSE){
       job<-parallel::mcparallel(
-        stage2fn(obj, file_from=filetmp, file_to=file, compress=compress, fn_to_run_after_compress=fn_to_run_after_compress),
+        stage2fn(obj, file_from=filetmp, file_to=file, compress=compress, fn_to_run_after_compress=fn_to_run_after_compress, parallel_cpus=parallel_cpus),
         detached=!flag_return_job)
     } else {
       if(!is.null(fn_to_run_after_compress)){
@@ -171,12 +171,14 @@ save.large.object<-function(obj, file, compress='xz', wait=FALSE, flag_use_tmp_s
   if(wait) {
     job<-save_fn_stage1(obj=obj, file=file, fn_to_run_after_save = fn_to_run_after_save,
                         flag_use_tmp_storage = flag_use_tmp_storage, flag_return_job = flag_return_job,
-                        stage2fn = save_fn_stage2, fn_to_run_after_compress=fn_to_run_after_compress, compress = compress)
+                        stage2fn = save_fn_stage2, fn_to_run_after_compress=fn_to_run_after_compress, compress = compress,
+                        parallel_cpus=parallel_cpus)
   } else {
     parallel::mcparallel(
       save_fn_stage1(obj=obj, file=file, fn_to_run_after_save = fn_to_run_after_save,
                      flag_use_tmp_storage = flag_use_tmp_storage, flag_return_job = flag_return_job,
-                     stage2fn = save_fn_stage2, fn_to_run_after_compress=fn_to_run_after_compress, compress = compress),
+                     stage2fn = save_fn_stage2, fn_to_run_after_compress=fn_to_run_after_compress, compress = compress,
+                     parallel_cpus=parallel_cpus),
       detached = TRUE)
   }
   if(flag_return_job) {
