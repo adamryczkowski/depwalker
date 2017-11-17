@@ -104,7 +104,7 @@ save.object<-function(
 #' @return parallel job with the backgroud save, if flag_return_job is set
 #' @export
 save.large.object<-function(obj, file, compress='xz', wait=FALSE, flag_use_tmp_storage=FALSE, fn_to_run_after_save=NULL,
-                            fn_to_run_after_compress, flag_return_job=FALSE, parallel_cpus=NULL) {
+                            fn_to_run_after_compress=NULL, flag_return_job=FALSE, parallel_cpus=NULL) {
   #Stage2 jest wykonywany w tle nawet wtedy, gdy wait=TRUE. Nie będzie wykonany tylko wtedy, gdy compress=FALSE
   if(is.null(parallel_cpus))
   {
