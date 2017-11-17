@@ -104,9 +104,13 @@ save.object<-function(
 #' @return parallel job with the backgroud save, if flag_return_job is set
 #' @export
 save.large.object<-function(obj, file, compress='xz', wait=FALSE, flag_use_tmp_storage=FALSE, fn_to_run_after_save=NULL,
-                            fn_to_run_after_compress, flag_return_job=FALSE) {
+                            fn_to_run_after_compress, flag_return_job=FALSE, parallel_cpus=NULL) {
   #Stage2 jest wykonywany w tle nawet wtedy, gdy wait=TRUE. Nie będzie wykonany tylko wtedy, gdy compress=FALSE
-  save_fn_stage2<-function(obj, file_from, file_to, compress, fn_to_run_after_compress) {
+  if(is.null(parallel_cpus))
+  {
+    parallel_cpus<-parallel::detectCores()
+  }
+  save_fn_stage2<-function(obj, file_from, file_to, compress, fn_to_run_after_compress, parallel_cpus) {
     pxz_wait <- flag_return_job || is.null(fn_to_run_after_save)
     if (compress=='xz')
     {
@@ -116,11 +120,11 @@ save.large.object<-function(obj, file, compress='xz', wait=FALSE, flag_use_tmp_s
 
         if(file_from != file_to) {
           system(paste0(
-            which_pxz, ' "', file_from, '" -c -T 8 >"', file_to,
+            which_pxz, ' "', file_from, '" -c -T ', parallel_cpus, ' >"', file_to,
             '.tmp" && mv -f "', file_to, '.tmp" "', file_to,'" && rm "', file_from, '"'), wait=pxz_wait)
         } else {
           system(paste0(
-            which_pxz, ' "', file_from, '" -c -T 8 >"', file_to,
+            which_pxz, ' "', file_from, '" -c -T ', parallel_cpus, ' >"', file_to,
             '.tmp" && mv -f "', file_to, '.tmp" "', file_to,'"'), wait=pxz_wait)
         }
       } else
