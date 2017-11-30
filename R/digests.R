@@ -69,7 +69,7 @@ calculate_code_digest<-function(metadata)
   files<-get_binary_files(metadata, flag_expand_paths = TRUE)
   if (!is.null(files))
   {
-    digests2<-plyr::aaply(files,1,tools::md5sum)
+    digests2<-plyr::aaply(as.character(files),1,tools::md5sum)
     digests<-c(digests,digests2)
   }
   if (length(digests)>1)
