@@ -103,14 +103,19 @@ save.object<-function(
 #' @param flag_return_job
 #' @return parallel job with the backgroud save, if flag_return_job is set
 #' @export
-save.large.object<-function(obj, file, compress='xz', wait=FALSE, flag_use_tmp_storage=FALSE, fn_to_run_after_save=NULL,
-                            fn_to_run_after_compress=NULL, flag_return_job=FALSE, parallel_cpus=NULL) {
+save.large.object<-function(obj, file, compress='xz', wait_for=c('save','compress','none'),
+                            flag_use_tmp_storage=FALSE, fn_to_run_after_save=NULL,
+                            fn_to_run_after_compress=NULL, parallel_cpus=NULL, flag_detach=FALSE) {
   #Stage2 jest wykonywany w tle nawet wtedy, gdy wait=TRUE. Nie będzie wykonany tylko wtedy, gdy compress=FALSE
+  if(!wait_for %in% c('save','compress','none')) {
+    stop("wait_for must be one of 'save','compress' or 'none'")
+  }
   if(is.null(parallel_cpus))
   {
     parallel_cpus<-parallel::detectCores()
   }
-  save_fn_stage2<-function(obj, file_from, file_to, compress, fn_to_run_after_compress, parallel_cpus) {
+  #Funkcja kompresuje plik po szybkim zapisaniu
+  save_fn_stage2<-function(obj, file_from, file_to, compress, fn_to_run_after_compress, parallel_cpus, flag_return_job) {
     pxz_wait <- flag_return_job || is.null(fn_to_run_after_save)
     if (compress=='xz')
     {
@@ -144,7 +149,7 @@ save.large.object<-function(obj, file, compress='xz', wait=FALSE, flag_use_tmp_s
   #Funkcja zapisuje plik na szybko, aby jaknajszybciej oddać sterowanie.
   #Funkcja może być użyta tylko wtedy, gdy nie używamy flag_use_tmp_storage i wait=FALSE
   save_fn_stage1<-function(obj, file, fn_to_run_after_save, flag_use_tmp_storage, flag_return_job,
-                           stage2fn, compress, fn_to_run_after_compress, parallel_cpus) {
+                           stage2fn, compress, fn_to_run_after_compress, parallel_cpus, flag_compress_async) {
     if(flag_use_tmp_storage){
       filetmp=tempfile(fileext = '.rds')
     } else {
@@ -156,9 +161,16 @@ save.large.object<-function(obj, file, compress='xz', wait=FALSE, flag_use_tmp_s
     }
 
     if(compress!=FALSE){
-      job<-parallel::mcparallel(
-        stage2fn(obj, file_from=filetmp, file_to=file, compress=compress, fn_to_run_after_compress=fn_to_run_after_compress, parallel_cpus=parallel_cpus),
-        detached=!flag_return_job)
+      if(flag_compress_async) {
+        job<-parallel::mcparallel(
+          stage2fn(obj, file_from=filetmp, file_to=file, compress=compress, fn_to_run_after_compress=fn_to_run_after_compress,
+                   parallel_cpus=parallel_cpus, flag_return_job=flag_return_job),
+          detached=!flag_return_job)
+      } else {
+        stage2fn(obj, file_from=filetmp, file_to=file, compress=compress, fn_to_run_after_compress=fn_to_run_after_compress,
+                 parallel_cpus=parallel_cpus, flag_return_job=flag_return_job)
+        job<-NULL
+      }
     } else {
       if(!is.null(fn_to_run_after_compress)){
         fn_to_run_after_compress(file)
@@ -168,24 +180,27 @@ save.large.object<-function(obj, file, compress='xz', wait=FALSE, flag_use_tmp_s
   }
 
 
-  if(wait) {
+
+  if(wait_for=='compress') {
+    save_fn_stage1(obj=obj, file=file, fn_to_run_after_save = fn_to_run_after_save,
+                   flag_use_tmp_storage = flag_use_tmp_storage, flag_return_job = !flag_detach,
+                   stage2fn = save_fn_stage2, fn_to_run_after_compress=fn_to_run_after_compress, compress = compress,
+                   parallel_cpus=parallel_cpus, flag_compress_async=FALSE)
+    job<-NULL
+  } else if (wait_for=='save') {
     job<-save_fn_stage1(obj=obj, file=file, fn_to_run_after_save = fn_to_run_after_save,
-                        flag_use_tmp_storage = flag_use_tmp_storage, flag_return_job = flag_return_job,
+                        flag_use_tmp_storage = flag_use_tmp_storage, flag_return_job = !flag_detach,
                         stage2fn = save_fn_stage2, fn_to_run_after_compress=fn_to_run_after_compress, compress = compress,
-                        parallel_cpus=parallel_cpus)
-  } else {
-    parallel::mcparallel(
+                        parallel_cpus=parallel_cpus, flag_compress_async=TRUE)
+  } else if (wait_for=='none') {
+    job<-parallel::mcparallel(
       save_fn_stage1(obj=obj, file=file, fn_to_run_after_save = fn_to_run_after_save,
-                     flag_use_tmp_storage = flag_use_tmp_storage, flag_return_job = flag_return_job,
+                     flag_use_tmp_storage = flag_use_tmp_storage, flag_return_job = !flag_detach,
                      stage2fn = save_fn_stage2, fn_to_run_after_compress=fn_to_run_after_compress, compress = compress,
-                     parallel_cpus=parallel_cpus),
-      detached = TRUE)
+                     parallel_cpus=parallel_cpus, flag_compress_async=FALSE),
+      detached = wait_for=='none')
   }
-  if(flag_return_job) {
-    return(jobs)
-  } else {
-    return(NULL)
-  }
+  return(job)
 }
 
 #' Saves all given objects to disk.
