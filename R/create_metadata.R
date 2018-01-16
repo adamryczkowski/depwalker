@@ -1,10 +1,14 @@
 #' Creates task's metadata object.
 #'
-#' The function will create the object in memory, it will not be saved to disk.
-#' @param code character vector with code. Each element of the vector will be treated as separate line.
-#' @param metadata.path path to the task's metadata. The metadata will not be saved with this command, but
+#' The function will create basic metadata describing the the object recipe.
+#' @param code Character vector with code. Each element of the vector will be treated as separate line.
+#' @param source.path Alternative way of specifying code to run. \code{code} and \code{source.path} are mutually exclusive, and required.
+#' @param metadata.path path to the task's metadata file without extension. The metadata will not be saved with this command, but
 #'    the path information is nevertheless required, as it is a mandatory part of the task's metadata specification.
-#' @param flag.never.execute.parallel if set, the task will not be executed in parallel. Defaults to \code{FALSE}.
+#'    If path is relative, it will be assumed to be relative to the current working directory.
+#' @param flag.never.execute.parallel if set, the task will never trigger parallel execution of dependent tasks. Defaults to \code{FALSE}.
+#' @param execution.directory directory relative to the metadata.path, which will be set as the current directory when the
+#'    code is run.
 #' @return task's metadata object. One might want to complete object's creation with complementary functions
 #'    \code{add.parent} and \code{add.object.record}
 #' @export
@@ -57,21 +61,30 @@ create.metadata<-function(code=NULL, metadata.path, flag.never.execute.parallel=
 #' computed as dependency before starting with the current one.
 #'
 #' If the parent's record with specified name already exists, it silently overwrites it.
-#' @param metadata already created metadata you wish to add ancestor to. You can create task's metadata from scratch with \code{\link{create.metadata}}.
-#' @param metadata.path either full or relative to metadata path with the
+#' @param metadata child metadata you wish to add ancestor to. You can create task's metadata from scratch with \code{\link{create.metadata}}.
+#' @param parent metadata with the dependency object. Child will remember the relative path to the object, even if it is not saved to disk yet.
+#' @param parent.path either relative to path of \emph{child metadata} object or full path with the
 #'   ancestor's metadata file.
-#' @param name name of the object's name in the parent task you with to import
+#' @param flag_remember_absolute_path If set, the parent will be remembered by its absolute path, rather than relative (default)
+#' @param name name of the object's name in the parent task you with to import.
 #' @param aliasname optional argument. If set it specifies alternate name of the imported
 #'   \code{name} object as it is used by the task's R code. This setting allows great
 #'   flexibility in naming task's output objects.
 #' @return modified \code{metadata} argument that includes specified parent's record.
 #' @export
 #' @seealso \code{\link{create.metadata}}, \code{\link{add.objectrecord}}
-add.parent<-function(metadata=NULL, name=NULL, parent.path=NULL,  parent=NULL, aliasname=NULL)
+add.parent<-function(metadata=NULL, name=NULL, parent.path=NULL,  parent=NULL, aliasname=NULL, flag_remember_absolute_path=FALSE)
 {
   assertMetadata(metadata)
   if(is.null(parent) && is.null(parent.path)){
     stop("You must provide either parent or parent.path")
+  }
+
+  if(!is.null(parent.path) && !is.null(parent)) {
+    if (parent$path != parent.path) {
+      stop(paste0("Ambivalent options encountered: parent.path (",parent.path,
+                  ") and the parent object, that points to the different directory: ", parent$path))
+    }
   }
 
   if(!is.null(parent)) {
@@ -84,12 +97,6 @@ add.parent<-function(metadata=NULL, name=NULL, parent.path=NULL,  parent=NULL, a
     parent<-load.metadata(parent.path)
   }
 
-  if(!is.null(parent.path) && !is.null(parent)) {
-    if (parent$path != parent.path) {
-      stop(paste0("Ambivalent options encountered: parent.path (",parent.path,
-                  ") and the parent object, that points to the different directory: ", parent$path))
-    }
-  }
 
   if (is.null(name))
   {
@@ -122,8 +129,12 @@ add.parent<-function(metadata=NULL, name=NULL, parent.path=NULL,  parent=NULL, a
   {
     stop(paste0(varname, " is already present in parents of ", metadata$path))
   }
-  path=pathcat::make.path.relative(base.path =  pathcat::path.cat(getwd(), dirname(metadata$path)),
-                                   target.path = pathcat::path.cat(getwd(), parent.path))
+
+  path<-pathcat::path.cat(getwd(), dirname(metadata$path), parent.path)
+  if(!flag_remember_absolute_path) {
+    path<-pathcat::make.path.relative(base.path =  pathcat::path.cat(getwd(), dirname(metadata$path)),
+                                      target.path = path)
+  }
   parents[[path]]<-list(name=name, path=path, aliasname=aliasname)
   metadata$parents<-parents
 

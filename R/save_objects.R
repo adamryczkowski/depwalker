@@ -35,6 +35,7 @@ wait.for.save<-function(path, name, timeout=30*60)
 save.object<-function(
   metadata,
   objectrecord,
+  envir=.GlobalEnv,
   flag.check.md5sum=TRUE)
 {
   assertMetadata(metadata)
@@ -46,8 +47,8 @@ save.object<-function(
     dir.create(dirname(filename),recursive = TRUE)
   create.lock.file(get.objectpath(metadata = metadata, objectrecord =  objectrecord))
 
-  obj<-eval(parse(text=objectrecord$name),envir=.GlobalEnv)
-  objectrecord$objectdigest<-calculate.object.digest(objectrecord$name)
+  obj<-get(objectrecord$name, envir = envir)
+  objectrecord$objectdigest<-calculate.object.digest(objectrecord$name, target.environment=envir)
   objectrecord$size<-bit64::as.integer64(as.numeric(object.size(obj)))
   objectrecord$mtime<-NULL
   objectrecord$filesize<-NULL
@@ -70,11 +71,11 @@ save.object<-function(
       system(paste0('/usr/bin/pxz "', filename, '" -c -T 8 >"', filename, getOption('object.save.extension'), '" && mv -f "', filename, getOption('object.save.extension'), '" "', filename,'"'), wait=TRUE)
     } else
     {
-      saveRDS(get(objectrecord$name, envir=.GlobalEnv),file=filename,compress=objectrecord$compress)
+      saveRDS(get(objectrecord$name, envir=envir),file=filename,compress=objectrecord$compress)
     }
   } else
   {
-    saveRDS(get(objectrecord$name, envir=.GlobalEnv),file=filename,compress=objectrecord$compress)
+    saveRDS(get(objectrecord$name, envir=envir),file=filename,compress=objectrecord$compress)
     release.lock.file(path=get.objectpath(metadata = metadata, objectrecord =  objectrecord))
   }
 
@@ -217,10 +218,14 @@ save.large.object<-function(obj, file, compress='xz', wait_for=c('save','compres
 #' @return updated metadata if success, or string that describe an error if failed.
 save.objects<-function(
   metadata,
+  envir=NULL,
   objectnames=NULL,
   flag.check.md5sum=TRUE,
   flag.save.in.background=TRUE)
 {
+  if(is.null(envir)) {
+    stop("envir is obligatory argument")
+  }
   checkmate::assertFlag(flag.save.in.background)
   if (is.null(objectnames)){
     objectrecords<-metadata$objectrecords
@@ -235,6 +240,7 @@ save.objects<-function(
                        {
                          save.object(metadata=metadata,
                                      objectrecord=objectrecord,
+                                     envir=envir,
                                      flag.check.md5sum=flag.check.md5sum)
                        }),
       error=function(e) {class(e)<-'try-error';e})
@@ -248,6 +254,7 @@ save.objects<-function(
              {
                save.object(metadata=metadata,
                            objectrecord=objectrecord,
+                           envir=envir,
                            flag.check.md5sum=flag.check.md5sum)
                })
   }

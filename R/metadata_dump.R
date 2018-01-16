@@ -123,7 +123,7 @@ join.metadata.dumps<-function(dump1, dump2)
   return(ans)
 }
 
-metadata.one.dump<-function(metadata, id, flag.ignore.mtime)
+metadata.one.dump<-function(metadata, id, flag.ignore.mtime, target.environment=.GlobalEnv)
 {
   m<-metadata
   f1<-file.exists(get.codepath(metadata))
@@ -161,10 +161,11 @@ metadata.one.dump<-function(metadata, id, flag.ignore.mtime)
     for(i in seq(along.with=metadata$objectrecords))
     {
       o<-m$objectrecords[[i]]
-      f1<-take.object.from.memory(o, flag.dry.run=TRUE)
+      f1<-take.object.from.memory(o, flag.dry.run=TRUE, target.environment=target.environment)
       f2<-file.exists(paste0(get.objectpath(objectrecord = o, metadata = metadata), getOption('object.save.extension')))
       if (f2)
-        f4<-load.object.from.disk(metadata=metadata, objectrecord = o, flag.dont.load = TRUE, flag.ignore.mtime=flag.ignore.mtime )=='OK'
+        f4<-load.object.from.disk(metadata=metadata, objectrecord = o, flag.dont.load = TRUE,
+                                  flag.ignore.mtime=flag.ignore.mtime, target.environment=target.environment )=='OK'
       else
         f4<-FALSE
       o$flags<-f1*1+f2*2+f4*4

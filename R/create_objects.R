@@ -20,6 +20,8 @@ create.objects<-function(
     objects.to.keep=NULL,
     objectaliases,
     metadata.path,
+    target.environment=NULL,
+    run.environment=NULL,
     flag.save.intermediate.objects=TRUE,
     flag.check.md5sum=TRUE,
     flag.save.in.background=TRUE,
@@ -27,6 +29,13 @@ create.objects<-function(
     flag.ignore.mtime=FALSE,
     estimation.only=NULL)
 {
+
+  if(is.null(run.environment)) {
+    stop("run.environment is mandatory")
+  }
+  if(is.null(target.environment)) {
+    stop("target.environment is mandatory")
+  }
   if (!is.logical(estimation.only))
   {
     assertTimeEstimation(estimation.only)
@@ -60,7 +69,7 @@ create.objects<-function(
 
   #First we load all ancestors
   ans<-load.and.validate.parents(metadata, flag.check.md5sum, estimation.only=estimation.only,
-                                 flag.ignore.mtime=flag.ignore.mtime)
+                                 flag.ignore.mtime=flag.ignore.mtime, target.environment=run.environment)
 
   if (flag.estimation.only)
   {
@@ -75,7 +84,7 @@ create.objects<-function(
   }
 
   #Now we execute the script
-  ans<-run.script(metadata, names,estimation.only=estimation.only)
+  ans<-run.script(metadata, names,estimation.only=estimation.only, run.environment=run.environment)
   if (flag.estimation.only)
   {
     return(ans)
@@ -88,18 +97,18 @@ create.objects<-function(
   metadata<-ans
 
   #Now it's time to remove all ancestors from memory, if there were ones
-  for(po in metadata$parents)
-  {
-    if (is.null(po$aliasname))
-    {
-      n<-po$name
-    } else {
-      n<-po$aliasname
-    }
-    rm(list=n, envir = .GlobalEnv)
-  }
-  if (!is.null(metadata$parents))
-    gc()
+  # for(po in metadata$parents)
+  # {
+  #   if (is.null(po$aliasname))
+  #   {
+  #     n<-po$name
+  #   } else {
+  #     n<-po$aliasname
+  #   }
+  #   rm(list=n, envir = .GlobalEnv)
+  # }
+  # if (!is.null(metadata$parents))
+  #   gc()
 
   #Zapisujemy wszystkie wyprodukowane obiekty (nie tylko te, o które byliśmy poproszeni)
   #flag.save.in.background=TRUE
@@ -111,6 +120,7 @@ create.objects<-function(
         parallel::mcparallel(
           save.objects(metadata=metadata,
                        objectnames=NULL,
+                       envir=run.environment,
                        flag.check.md5sum=flag.check.md5sum,
                        flag.save.in.background=flag.save.in.background),
           detached=TRUE),
@@ -121,6 +131,7 @@ create.objects<-function(
     {
       metadata<-save.objects(metadata=metadata,
                    objectnames=NULL,
+                   envir=run.environment,
                    flag.check.md5sum=flag.check.md5sum,
                    flag.save.in.background=flag.save.in.background)
     }
@@ -134,20 +145,24 @@ create.objects<-function(
     {
       idx<-which(objects.to.keep == objrec$name)
       oa=objectaliases[idx]
-      if (objrec$name != oa)
-      {
-        eval(parse(text=paste0(oa, '<-', objrec$name)),envir=.GlobalEnv)
-        if (exists(objrec$name, envir=.GlobalEnv)) # nocov
-          rm(list=objrec$name,envir=.GlobalEnv) # nocov
-      }
-    } else {
-      if (exists(objrec$name, envir=.GlobalEnv))
-        rm(list=objrec$name,envir=.GlobalEnv)
-      flag.do.gc<-TRUE
+
+      #This obsoletes the following
+      assign(oa, value=run.environment[[objrec$name]], envir=target.environment)
+
+#      if (objrec$name != oa)
+#      {
+#        eval(parse(text=paste0(oa, '<-', objrec$name)),envir=.GlobalEnv)
+#        if (exists(objrec$name, envir=.GlobalEnv)) # nocov
+#          rm(list=objrec$name,envir=.GlobalEnv) # nocov
+#      }
+#    } else {
+#      if (exists(objrec$name, envir=.GlobalEnv))
+#        rm(list=objrec$name,envir=.GlobalEnv)
+#      flag.do.gc<-TRUE
     }
   }
 
-  if (flag.forget.parents && length(metadata$parents)>0)
+  if (!flag.forget.parents && length(metadata$parents)>0)
   {
     for(i in seq(along.with=metadata$parents))
     {
@@ -156,16 +171,17 @@ create.objects<-function(
         n<-parent$name
       else
         n<-parent$aliasname
-      if (! (n %in% objects.to.keep))
-      {
-        if (exists(n, envir=.GlobalEnv))
-          rm(list=n,envir=.GlobalEnv)
-        flag.do.gc<-TRUE
-      }
+      assign(n, value=run.environment[[n]], envir = target.environment)
+#      if ((n %in% objects.to.keep))
+#      {
+#        if (exists(n, envir=.GlobalEnv))
+#          rm(list=n,envir=.GlobalEnv)
+#        flag.do.gc<-TRUE
+#      }
     }
   }
 
-  if (flag.do.gc)
-    gc()
+ # if (flag.do.gc)
+#    gc()
   return(metadata)
 }

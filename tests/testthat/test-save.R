@@ -1,6 +1,8 @@
 context("Correct hanlding of concurrent writes/saves")
 
 source('testfunctions.R')
+#source('tests/testthat/testfunctions.R')
+
 
 test_that("Saving to non-existent directory (1)", {
   m<-testf1(tmpdir)
@@ -58,8 +60,8 @@ test_that("Testing saving with default R compression (13)", {
   expect_true(filesize>filesize2)
 })
 
-test_that("Saving more than one object", {
-  #TODO:
-  #Save two objects at once with code that does some side-effect.
-  #Then see if they get loaded from a) memory, b) disk without the code being run
-})
+# test_that("Saving more than one object", {
+#   #TODO:
+#   #Save two objects at once with code that does some side-effect.
+#   #Then see if they get loaded from a) memory, b) disk without the code being run
+# })

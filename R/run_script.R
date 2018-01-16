@@ -40,7 +40,7 @@ capture.evaluate<-function(code, envir=.GlobalEnv)
   return(list(output=out, is.error=is_error))
 }
 
-run.script<-function(metadata, objects.to.keep,estimation.only=NULL)
+run.script<-function(metadata, objects.to.keep,estimation.only=NULL, run.environment=NULL)
 {
   if (!is.logical(estimation.only))
   {
@@ -56,7 +56,7 @@ run.script<-function(metadata, objects.to.keep,estimation.only=NULL)
   if (file.exists(errfile))
     unlink(errfile)
 
-  vars.before<-c(ls(envir=.GlobalEnv, all.names = TRUE), objects.to.keep)
+  vars.before<-c(ls(envir=run.environment, all.names = TRUE), objects.to.keep)
   gc()
   busycpus<-cpu.usage.list()$busy.cpus
   fmem<-memfree()
@@ -66,7 +66,7 @@ run.script<-function(metadata, objects.to.keep,estimation.only=NULL)
     setwd(get.codepath(metadata, metadata$execution.directory))
   }
   time<-as.numeric(system.time(
-    out<-capture.evaluate(metadata$code, envir=.GlobalEnv)
+    out<-capture.evaluate(metadata$code, envir=run.environment)
   ))[1:3]
   coresinfo<-cpu.count()
   gc()
@@ -95,12 +95,12 @@ run.script<-function(metadata, objects.to.keep,estimation.only=NULL)
     metadata$timecosts<-data.table::as.data.table(timecost)
   else
     metadata$timecosts<-rbind(metadata$timecosts, timecost)
-  vars.after<-ls(envir=.GlobalEnv, all.names = TRUE)
+  vars.after<-ls(envir=run.environment, all.names = TRUE)
   vars.to.delete<-setdiff(setdiff(vars.after, vars.before), objects.to.keep)
   if (length(vars.to.delete)>0)
-    rm(list=vars.to.delete, envir=.GlobalEnv)
+    rm(list=vars.to.delete, envir=run.environment)
 
-  existances<-sapply(objects.to.keep, function(n)exists(n, envir=.GlobalEnv))
+  existances<-sapply(objects.to.keep, function(n)exists(n, envir=run.environment))
   if (!all(existances))
     return(NULL)
 

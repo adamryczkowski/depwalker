@@ -26,6 +26,22 @@ wait.for.lock<-function(path, timeout)
   }
 }
 
+lock.exists<-function(path, timeout) {
+  lockfile<-paste0(path,getOption('lock.extension'))
+  if (file.exists(lockfile))
+  {
+    t<-as.numeric(file.mtime(lockfile))
+      if (t-as.numeric(Sys.time())>timeout)
+      {
+        return(FALSE)
+      } else {
+        return(TRUE)
+      }
+    } else {
+    return(FALSE)
+  }
+}
+
 #' Creates lock file on a given path. Lock file is just a 0-length file.
 #'
 #' The file will have an extension getOption('lock.extension')

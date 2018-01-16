@@ -1,6 +1,8 @@
 context("Creation of task's metadata")
 library(depwalker)
 
+#source('tests/testthat/testfunctions.R')
+
 source('testfunctions.R')
 
 test_that("Test create metadata (1)", expect_equal_to_reference({

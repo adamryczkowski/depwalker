@@ -234,27 +234,31 @@ parents.digest<-function(metadata)
 #Funkcja kalkuluje object.digest obiektu. Nie wkłada go do parentrecord.
 #Dla obiektów typu data.frame używany jest szczególnie wydajny pamięciowo
 #algorytm, który liczy digest zmienna-po-zmiennej
-calculate.object.digest<-function(object)
+calculate.object.digest<-function(object, target.environment=NULL)
 {
   if (!is.character(object))
     stop('Needs string parameter')
 
-  #Należy usunąć nasze metadane do kalkulacji digestu, bo metadane same mogą zawierać digest i nigdy nie uzyskamy spójnych wyników
-  parentrecord<-attr(get(object, envir=.GlobalEnv),'parentrecord')
-  if (!is.null(parentrecord))
-    eval(parse(text=paste0('setattr(', object, ", 'parentrecord', NULL)")),envir=.GlobalEnv)
+  if(is.null(target.environment)) {
+    stop("target.environment is missing")
+  }
 
-  if (data.table::is.data.table(get(object, envir=.GlobalEnv)))
+  #Należy usunąć nasze metadane do kalkulacji digestu, bo metadane same mogą zawierać digest i nigdy nie uzyskamy spójnych wyników
+  parentrecord<-attr(get(object, envir=target.environment),'parentrecord')
+  if (!is.null(parentrecord))
+    eval(parse(text=paste0('setattr(', object, ", 'parentrecord', NULL)")),envir=target.environment)
+
+  if (data.table::is.data.table(get(object, envir=target.environment)))
   {
-    d<-tryCatch(parallel::mclapply(get(object,envir = .GlobalEnv) , function(x) digest::digest(x, algo="md5")),
+    d<-tryCatch(parallel::mclapply(get(object,envir = target.environment) , function(x) digest::digest(x, algo="md5")),
       error=function(e) e)
     if ('error' %in% class(d))
     {
-      d<-lapply(get(object,envir = .GlobalEnv) , function(x) digest::digest(x, algo="md5"))
+      d<-lapply(get(object,envir = target.environment) , function(x) digest::digest(x, algo="md5"))
     }
     d<-digest::digest(d[order(names(d))])
   } else {
-    d<-digest::digest(get(object, envir=.GlobalEnv))
+    d<-digest::digest(get(object, envir=target.environment))
   }
   assertDigest(d)
   return(d)

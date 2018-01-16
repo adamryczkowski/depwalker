@@ -1,5 +1,5 @@
 context("Data.table specific tests")
-
+#source('tests/testthat/testfunctions.R')
 source('testfunctions.R')
 
 test_that("definition of task, which outputs data.table (6)", {

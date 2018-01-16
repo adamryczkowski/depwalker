@@ -15,7 +15,7 @@
 #' @return \code{TRUE} if object is found and \code{FALSE} otherwise. If true, the object can be found
 #'    in \code{.GlobalEnv} under the name \code{aliasname} if present, and original name.
 #'
-take.object.from.memory<-function(objectrecord, aliasname=NULL, flag.check.object.digest=TRUE, flag.dry.run=FALSE)
+take.object.from.memory<-function(objectrecord, aliasname=NULL, target.environment=NULL, flag.check.object.digest=TRUE, flag.dry.run=FALSE)
 {
   # Musimy się upewnić, że obiekt w pamięci to ten sam co w parentrecord.
   # Musi spełniać następujące cechy:
@@ -24,8 +24,12 @@ take.object.from.memory<-function(objectrecord, aliasname=NULL, flag.check.objec
   # - objectsize musi się zgadzać lub
   # - objectdigest musi się zgadzać
 
-  if (exists(objectrecord$name,envir = .GlobalEnv))
-    obj<-get(x=objectrecord$name,envir = .GlobalEnv)
+  if(is.null(target.environment)) {
+    stop("target.environment is an obligatory argument")
+  }
+
+  if (exists(objectrecord$name,envir = target.environment))
+    obj<-get(x=objectrecord$name, envir = target.environment)
   else
     return(FALSE) #nie ma obiektu lub zła nazwa
 
@@ -33,21 +37,21 @@ take.object.from.memory<-function(objectrecord, aliasname=NULL, flag.check.objec
   {
     if (!is.null(aliasname) & !flag.dry.run)
       if (aliasname!=objectrecord$name)
-        assign(aliasname, obj, envir = .GlobalEnv)
+        assign(aliasname, obj, envir = target.environment)
     return(TRUE) #Skoro mamy nie sprawdzać object digestu, to znaczy że na tym etapie obiekt jest ok.
   }
 
   if (is.null(objectrecord$objectdigest))
     return(FALSE) #Nie mamy objectdigestu, więc nie mamy jak sprawdzić, czy obiekt jest OK. Dlatego FALSE
 
-  crc<-calculate.object.digest(objectrecord$name)
+  crc<-calculate.object.digest(objectrecord$name, target.environment)
 
   if (objectrecord$objectdigest!=crc)
     return(FALSE)
 
   if (!is.null(aliasname) & !flag.dry.run)
     if (aliasname!=objectrecord$name)
-      assign(aliasname, obj, envir = .GlobalEnv)
+      assign(aliasname, obj, envir = target.environment)
   return(TRUE)
 }
 
@@ -76,8 +80,9 @@ take.object.from.memory<-function(objectrecord, aliasname=NULL, flag.check.objec
 #' @return Character string that describes the reason, why the object could not be loaded, or
 #'   'OK' string to indicate that the object was or can be loaded.
 #'
-load.object.from.disk<-function(metadata, objectrecord, aliasname=NULL, flag.dont.load=FALSE, flag.check.md5=TRUE,
-                                flag.ignore.mtime=FALSE)
+load.object.from.disk<-function(metadata, objectrecord, aliasname=NULL, target.environment=NULL,
+                                flag.dont.load=FALSE, flag.check.md5=TRUE,
+                                flag.ignore.mtime=FALSE, flag.allow.promises=TRUE)
 {
   checkmate::assertFlag(flag.dont.load)
   checkmate::assertFlag(flag.check.md5)
@@ -86,6 +91,10 @@ load.object.from.disk<-function(metadata, objectrecord, aliasname=NULL, flag.don
     aliasname<-objectrecord$name
   else
     assertVariableName(aliasname)
+
+  if(is.null(target.environment)) {
+    stop("target.environment is a mandatory argument")
+  }
 
   #we need to wait until the job that saves that file actually ends
   rds.filename=get.objectpath(objectrecord = objectrecord,metadata = metadata)
@@ -117,15 +126,28 @@ load.object.from.disk<-function(metadata, objectrecord, aliasname=NULL, flag.don
       return('File digest mismatch')
     }
     #digest is valid, we can load the object itself
-    if(!flag.dont.load)
-      eval(parse(text=paste0(aliasname,'<-readRDS("',rds.filename,'")')),envir=.GlobalEnv)
+    if(!flag.dont.load) {
+      if(flag.allow.promises) {
+        env<-new.env()
+        env$rds.filename<-rds.filename
+        delayedAssign(aliasname, value = readRDS(rds.filename), assign.env = target.environment, eval.env = env)
+      } else {
+        assign(aliasname, value = readRDS(rds.filename), envir = target.environment)
+      }
+    }
     #              setattr(obj,'digest.metadata',parentrecord)
     #              assign(parentrecord$name,obj,envir=.GlobalEnv)
     return('OK') #OK
-  } else
-  {
-    if(!flag.dont.load)
-      eval(parse(text=paste0(aliasname,'<-readRDS("',rds.filename,'")')),envir=.GlobalEnv)
+  } else {
+    if(!flag.dont.load) {
+      if(flag.allow.promises) {
+        env<-new.env()
+        env$rds.filename<-rds.filename
+        delayedAssign(aliasname, value = readRDS(rds.filename), assign.env = target.environment, eval.env = env)
+      } else {
+        assign(aliasname, value = readRDS(rds.filename), envir = target.environment)
+      }
+    }
     #digest is valid, we can load the object itself
     return('OK') #OK
   }
@@ -134,11 +156,15 @@ load.object.from.disk<-function(metadata, objectrecord, aliasname=NULL, flag.don
 
 #' Sets the objects to NULL, effectively unloading them.
 #' @param parentrecords Parentrecords that describe objects to unload.
-unload.objects<-function(parentrecords)
+unload.objects<-function(parentrecords, envir=NULL)
 {
+  if(is.null(envir)) {
+    browser()
+    stop("envir cannot be empty")
+  }
   for (parentrecord in parentrecords)
   {
-    assign(parentrecord$name,NULL,envir=.GlobalEnv)
+    assign(parentrecord$name,NULL,envir=envir)
   }
 }
 
@@ -165,7 +191,8 @@ unload.objects<-function(parentrecords)
 #'
 #'   If \code{estimation.only!=NULL} it returns list used by \code{metadata_dump}
 #'
-load.and.validate.parents<-function(metadata, flag.check.md5=FALSE,estimation.only=NULL,
+load.and.validate.parents<-function(metadata, target.environment=target.environment,
+                                    flag.check.md5=FALSE,estimation.only=NULL,
                                     flag.ignore.mtime=FALSE)  #FALSE jeśli się nie uda
 {
   checkmate::assertFlag(flag.check.md5)
@@ -226,13 +253,23 @@ load.and.validate.parents<-function(metadata, flag.check.md5=FALSE,estimation.on
         return(FALSE)
     }
     os<-metadata.objects.size(metadata)
+    load_speed<-getOption('object.load.speed')
     if(is.na(os))
       return(FALSE)
     if (os>memfree/2.5)
       return(FALSE)
     for(objrec in objrecs)
     {
-      if (load.object.from.disk(metadata=metadata,objectrecord =  objrec,  flag.dont.load = TRUE, flag.check.md5=flag.check.md5, flag.ignore.mtime =  flag.ignore.mtime)=='OK')
+      if (take.object.from.memory(objectrecord = objrec, target.environment = target.environment,
+                                  flag.dry.run = FALSE)) {
+        return(FALSE) #The object is already there, no need to paralellize
+      }
+      if (load.object.from.disk(metadata = metadata,objectrecord = objrec,
+                                target.environment = target.environment,
+                                flag.dont.load = TRUE,
+                                flag.check.md5=flag.check.md5,
+                                flag.allow.promises = TRUE,
+                                flag.ignore.mtime = flag.ignore.mtime)=='OK')
         return(FALSE) #We don't parallelize simple reading from disk
     }
     # load.time<-metadata$filesize * object.load.speed
@@ -276,7 +313,10 @@ load.and.validate.parents<-function(metadata, flag.check.md5=FALSE,estimation.on
   for(i in 1:sum(!f))
   {
     l=parents.objects[[idxs[i]]]
-    ans<-load.objects.by.metadata(metadata=l$metadata, metadata.path=pathcat::path.cat(dirname(metadata$path), l$metadata.path), objectnames=l$names, aliasnames=l$aliasnames)
+    ans<-load.objects.by.metadata(metadata=l$metadata,
+                                  metadata.path=pathcat::path.cat(dirname(metadata$path), l$metadata.path),
+                                  target.environment=target.environment,
+                                  objectnames=l$names, aliasnames=l$aliasnames)
     if (is.logical(ans))
       return (FALSE) #We didn't manage to read
   }
@@ -296,7 +336,7 @@ load.and.validate.parents<-function(metadata, flag.check.md5=FALSE,estimation.on
         aliasname<-l$aliasnames[i]
         name<-l$names[i]
         if (!is.null(obj[[name]]))
-          assign(aliasname,obj[[name]],envir=.GlobalEnv)
+          assign(aliasname,obj[[name]],envir=target.environment)
         else
           stop(paste0("Variable ",name, " not found in ", l$metadata.path, " after parallel run"))
       }

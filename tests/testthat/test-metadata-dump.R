@@ -1,16 +1,19 @@
 context("Correct dumping of task execution information")
 
 source('testfunctions.R')
+#source('tests/testthat/testfunctions.R')
 
 test_that("Testing for simple metadata.dump (1)", {
   m<-testf1(tmpdir)
   dump<-depwalker:::metadata.dump(m$path)
+  expect_true('list' %in% class(dump))
 })
 
 test_that("Testing for metadata.dump of already executed task (1)", {
   m<-testf1(tmpdir)
   depwalker:::get.object(metadata=m)
   dump<-depwalker:::metadata.dump(m$path)
+  expect_true('list' %in% class(dump))
 })
 
 test_that("Testing for metadata.dump of complicated task with parents (8)",{

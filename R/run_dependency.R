@@ -32,10 +32,12 @@
 load.object<-function(metadata.path=NULL,
                       metadata=NULL,
                       objectnames=NULL,
+                      target.environment=.GlobalEnv,
                       flag.save.intermediate.objects=TRUE,
                       flag.check.md5sum=TRUE,
                       flag.ignore.mtime=FALSE,
-                      flag.save.in.background=TRUE, flag.check.object.digest=TRUE)
+                      flag.save.in.background=TRUE, flag.check.object.digest=TRUE,
+                      flag.allow.promises=TRUE)
 {
 
   if (is.null(metadata.path) && is.null(metadata))
@@ -70,11 +72,13 @@ load.object<-function(metadata.path=NULL,
     metadata.path=metadata.path,
     objectnames=objectnames,
     aliasnames=objectnames,
+    target.environment = target.environment,
     flag.save.intermediate.objects=flag.save.intermediate.objects,
     flag.check.md5sum=flag.check.md5sum,
     flag.save.in.background=flag.save.in.background,
     flag.ignore.mtime = flag.ignore.mtime,
-    flag.check.object.digest=flag.check.object.digest)
+    flag.check.object.digest=flag.check.object.digest,
+    flag.allow.promises=flag.allow.promises)
   if(is.null(ans)){
     stop("Error during object execution")
   }
@@ -123,11 +127,15 @@ get.object<-function(
   {
     objectname=names(metadata$objectrecords)
   }
+
+  env<-new.env()
+
   assertVariableNames(objectname)
   ans<-load.object(
     metadata.path=metadata.path,
     metadata=metadata,
     objectnames=objectname,
+    target.environment = env,
     flag.save.intermediate.objects=flag.save.intermediate.objects,
     flag.save.in.background=flag.save.in.background,
     flag.ignore.mtime = flag.ignore.mtime,
@@ -137,7 +145,7 @@ get.object<-function(
     ans<-list()
     for (o in objectname)
     {
-      ans[[o]]<-get(o, envir=.GlobalEnv)
+      ans[[o]]<-get(o, envir=env)
     }
     if (length(objectname)>1 || flag.return.list)
       return(ans)
@@ -169,16 +177,18 @@ get.object<-function(
 #' @return Returns updated metadata on success, and \code{NULL} on failure.
 
 load.objects.by.metadata<-function(
-    metadata,
-    metadata.path,
+    metadata=NULL,
+    metadata.path=NULL,
     objectnames,
     aliasnames=NULL,
+    target.environment=.GlobalEnv,
     flag.save.intermediate.objects=TRUE,
     flag.check.md5sum=TRUE,
     flag.save.in.background=TRUE,
     flag.check.object.digest=TRUE,
     flag.ignore.mtime=FALSE,
-    flag.estimate.only=FALSE) #True oznacza, że się udało
+    flag.estimate.only=FALSE,
+    flag.allow.promises=TRUE) #True oznacza, że się udało
 {
   if (is.null(metadata$flag.force.recalculation))
     flag.force.recalculation<-FALSE
@@ -193,7 +203,6 @@ load.objects.by.metadata<-function(
       metadata<-code_changed
     }
   }
-
   checkmate::assertPathForOutput(metadata.path, overwrite=TRUE)
   assertMetadata(metadata)
   for(n in objectnames)
@@ -237,6 +246,9 @@ load.objects.by.metadata<-function(
     names(ans$load.modes)<-objectnames
   } else
   {
+    if(lock.exists(paste0(metadata.path,'.meta'), 120*60)) {
+      message(paste0("Waiting to lock ", metadata.path, "..."))
+    }
     wait.for.lock(paste0(metadata.path,'.meta'), 120*60) #max 2 hours
     create.lock.file(paste0(metadata.path,'.meta'))
     ans<-FALSE
@@ -254,8 +266,10 @@ load.objects.by.metadata<-function(
         memobjects[i]<-take.object.from.memory(
                           objectrecord = objrec,
                           aliasname = aliasname,
+                          target.environment=target.environment,
                           flag.check.object.digest = flag.check.object.digest,
-                          flag.dry.run = flag.estimate.only),
+                          flag.dry.run = flag.estimate.only,
+                          target.environment=target.environment),
         error = function(e) release.lock.file(paste0(metadata.path,'.meta'))
       )
     }
@@ -306,7 +320,14 @@ load.objects.by.metadata<-function(
       if (is.na(diskobjects[i]))
       {
         tryCatch(
-          diskobjects[i]<-load.object.from.disk(metadata=metadata, objectrecord = objrec,  aliasname = aliasname, flag.dont.load = flag.estimate.only, flag.check.md5 = flag.check.md5sum, flag.ignore.mtime=flag.ignore.mtime)=='OK',
+          diskobjects[i]<-load.object.from.disk(metadata=metadata,
+                                                objectrecord = objrec,
+                                                aliasname = aliasname,
+                                                flag.dont.load = flag.estimate.only,
+                                                flag.check.md5 = flag.check.md5sum,
+                                                flag.ignore.mtime=flag.ignore.mtime,
+                                                target.environment=target.environment,
+                                                flag.allow.promises=flag.allow.promises)=='OK',
           error = function(e) release.lock.file(paste0(metadata.path,'.meta'))
         )
       }
@@ -344,11 +365,14 @@ load.objects.by.metadata<-function(
       }
     }
   }
+  run.environment<-new.env(parent=target.environment)
   tryCatch(
     create.ans<-create.objects(metadata=metadata,
                                metadata.path=metadata.path,
                                objects.to.keep=objectnames,
                                objectaliases=aliasnames,
+                               run.environment=run.environment,
+                               target.environment=target.environment,
                                flag.save.intermediate.objects=flag.save.intermediate.objects,
                                flag.check.md5sum=flag.check.md5sum,
                                flag.save.in.background=flag.save.in.background,
@@ -378,11 +402,13 @@ get.objects.by.metadata<-function(
     flag.ignore.mtime=FALSE,
     flag.drop.list.if.one.object=TRUE)
 {
+  env<-new.env()
   if (!is.null(load.objects.by.metadata(
           metadata=metadata,
           metadata.path=metadata.path,
           objectnames=objectnames,
           aliasnames = aliasnames,
+          target.environment=env,
           flag.save.intermediate.objects=flag.save.intermediate.objects,
           flag.check.md5sum=flag.check.md5sum,
           flag.ignore.mtime = flag.ignore.mtime,
@@ -391,7 +417,7 @@ get.objects.by.metadata<-function(
     ans<-list()
     for (n in objectnames)
     {
-      ans[[n]]<-get(n, envir=.GlobalEnv)
+      ans[[n]]<-get(n, envir=env)
     }
     if (length(objectnames)>1 || !flag.drop.list.if.one.object)
       return(ans)

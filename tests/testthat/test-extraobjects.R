@@ -1,5 +1,6 @@
 context("Correct handling of external changes to the source codes")
 
+#source('tests/testthat/testfunctions.R')
 source('testfunctions.R')
 
 test_that("External change to the main source code (1)", {
