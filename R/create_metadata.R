@@ -73,7 +73,8 @@ create.metadata<-function(code=NULL, metadata.path, flag.never.execute.parallel=
 #' @return modified \code{metadata} argument that includes specified parent's record.
 #' @export
 #' @seealso \code{\link{create.metadata}}, \code{\link{add.objectrecord}}
-add.parent<-function(metadata=NULL, name=NULL, parent.path=NULL,  parent=NULL, aliasname=NULL, flag_remember_absolute_path=FALSE)
+add.parent<-function(metadata=NULL, name=NULL, parent.path=NULL,  parent=NULL, aliasname=NULL, flag_remember_absolute_path=FALSE,
+                     flag_overwrite_parent=FALSE)
 {
   assertMetadata(metadata)
   if(is.null(parent) && is.null(parent.path)){
@@ -98,44 +99,52 @@ add.parent<-function(metadata=NULL, name=NULL, parent.path=NULL,  parent=NULL, a
   }
 
 
-  if (is.null(name))
+  if (is.null(name) && is.null(aliasname))
   {
-    counts<-sum(plyr::laply(parent$objectrecords, function(or){names=or$name; return(length(names))}))
-    if (counts==1)
-      name<-paste0(parent$objectrecords[[1]]$name,collapse="; ")
-    else
-      stop(paste0("Cannot unambiguously infer name of the imported object as there are ",counts, " exported objects in the parent."))
+    name<-purrr::map_chr(parent$objectrecords, 'name')
+    aliasname<-name
+  } else {
+    if(is.null(aliasname)) {
+      aliasname<-name
+    }
+    if(is.null(name)) {
+      name<-purrr::map_chr(parent$objectrecords, 'name')
+    }
+  }
+  if(length(aliasname)!=length(name)) {
+    stop("Length of aliasname and name must be the same. In name is not specified, aliasname must have length equal to the number of exported objects")
   }
 
 
-  checkmate::assertString(name)
-  if (!is.null(aliasname))
-  {
-    assertVariableName(aliasname)
-    varname=aliasname
-  } else
-    varname=name
+  assertVariableNames(aliasname)
+  assertVariableNames(name)
+
   parents<-metadata$parents
-  parentnames<-sapply(
-    parents,
-    function(x) {
-      if (is.null(x$aliasname)) {
-        x$name
-      } else {
-        x$aliasname
-  }})
+  parentnames<-unlist(purrr::map(parents, ~.$aliasname))
 
-  if (varname %in% parentnames)
-  {
-    stop(paste0(varname, " is already present in parents of ", metadata$path))
+  if(length(parentnames)>0) {
+    if (sum(aliasname %in% parentnames)>0)
+    {
+      tmp<-aliasname %in% parentnames
+      stop(paste0(paste0(aliasname[[tmp]], collapse=', '), ' is already present in parents of ', metadata$path))
+      #stop(paste0('Object(s) ', paste0(aliasname[[tmp]], collapse=', '), " is/are already present in parents of ", metadata$path))
+    }
   }
+
 
   path<-pathcat::path.cat(getwd(), dirname(metadata$path), parent.path)
   if(!flag_remember_absolute_path) {
     path<-pathcat::make.path.relative(base.path =  pathcat::path.cat(getwd(), dirname(metadata$path)),
                                       target.path = path)
   }
-  parents[[path]]<-list(name=name, path=path, aliasname=aliasname)
+  new_parent<-list(name=name, path=path, aliasname=aliasname)
+
+  if(path %in% names(parents) && !flag_overwrite_parent) {
+    if(!identical(new_parent, parents[[path]])) {
+      stop("Parent ", path, " is already present in the list of parents")
+    }
+  }
+  parents[[path]]<-new_parent
   metadata$parents<-parents
 
   assertMetadata(metadata)
@@ -208,8 +217,15 @@ add.objectrecord<-function(metadata, name, path=NULL, compress='xz')
 #' @export
 #' @seealso \code{\link{create.metadata}}, \code{\link{add.parent}}
 #' @export
-add_source_file<-function(metadata, filepath, code=NULL, flag.binary=FALSE, flag.checksum=TRUE)
+add_source_file<-function(metadata, filepath, code=NULL, flag.binary=FALSE, flag.r=NULL, flag.checksum=TRUE)
 {
+  if(is.null(flag.r)) {
+    if(flag.binary) {
+      flag.r = FALSE
+    } else {
+      flag.r = TRUE
+    }
+  }
   depwalker:::assertMetadata(metadata)
   checkmate::assert_logical(flag.checksum)
   filepath <- depwalker:::get.codepath(metadata, filepath)
@@ -235,13 +251,13 @@ add_source_file<-function(metadata, filepath, code=NULL, flag.binary=FALSE, flag
     message(paste0("Written ", length(code), " lines into ", filepath, "."))
     flag.binary=FALSE
   }
-  metadata<-append_extra_code(metadata, filepath, flag.checksum,flag.binary = flag.binary)
+  metadata<-append_extra_code(metadata, filepath, flag.checksum,flag.binary = flag.binary, flag.r = flag.r)
   return(metadata)
 }
 
 #' Function that appends file path to the metadata. It does no checking, it simply
 #' updates the data structure.
-append_extra_code<-function(metadata, filepath, flag.checksum, flag.binary)
+append_extra_code<-function(metadata, filepath, flag.checksum, flag.binary, flag.r)
 {
   filepath=pathcat::make.path.relative(base.path =  pathcat::path.cat(getwd(), dirname(metadata$path)), target.path = filepath)
 
@@ -251,7 +267,7 @@ append_extra_code<-function(metadata, filepath, flag.checksum, flag.binary)
   } else {
     extrasources<-metadata$extrasources
   }
-  extrasources[filepath]<-list(list(path=filepath, flag.checksum=flag.checksum, flag.binary=flag.binary))
+  extrasources[filepath]<-list(list(path=filepath, flag.checksum=flag.checksum, flag.binary=flag.binary, flag.r=flag.r))
   metadata$extrasources<-extrasources
   return(metadata)
 }

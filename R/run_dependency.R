@@ -268,8 +268,7 @@ load.objects.by.metadata<-function(
                           aliasname = aliasname,
                           target.environment=target.environment,
                           flag.check.object.digest = flag.check.object.digest,
-                          flag.dry.run = flag.estimate.only,
-                          target.environment=target.environment),
+                          flag.dry.run = flag.estimate.only),
         error = function(e) release.lock.file(paste0(metadata.path,'.meta'))
       )
     }

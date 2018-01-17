@@ -55,9 +55,11 @@ test_that("Testing saving with default R compression (13)", {
   m$objectrecords[[1]]$compress<-'xz'
   depwalker:::make.sure.metadata.is.saved(m)
   unlink(file.path(tmpdir,'data.rds'))
+  cat("Saving...\n")
   depwalker:::load.object(metadata=m, flag.save.in.background = FALSE)
+  cat("Saved.\n")
   filesize2<-file.size(file.path(tmpdir,'data.rds'))
-  expect_true(filesize>filesize2)
+  testthat::expect_true(filesize>filesize2)
 })
 
 # test_that("Saving more than one object", {

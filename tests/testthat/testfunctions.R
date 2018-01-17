@@ -1,5 +1,6 @@
-tmpdir<-tempfile('depwalker.test.')
-dir.create(tmpdir, showWarnings = FALSE);
+sample(c(letters, LETTERS, 0:9), 15)
+tmpdir<-file.path(tempfile('depwalker.test.'), paste0(sample(c(letters, LETTERS, 0:9), 15),collapse=''))
+dir.create(tmpdir, showWarnings = FALSE, recursive = TRUE);
 
 testf1<-function(tmpdir) {
   code<-"x<-1:10";
@@ -9,7 +10,7 @@ testf1<-function(tmpdir) {
 }
 
 testf2<-function(tmpdir) {
-  testf1(tmpdir);
+  m1<-testf1(tmpdir);
   code<-"y<-sum(x)";
   m<-depwalker:::create.metadata(code, file.path(tmpdir, "task2"));
   m<-depwalker:::add.parent(metadata = m,  name = 'x',   parent.path = file.path(tmpdir, "task1") );
@@ -30,6 +31,8 @@ testf3<-function(tmpdir)
 
 testf4<-function(tmpdir)
 {
+  testf1(tmpdir)
+  testf3(tmpdir)
   code<-"ans<-mean(a1,a2,y3)";
   m<-depwalker:::create.metadata(code, file.path(tmpdir, "task4"));
   m<-depwalker:::add.parent(metadata = m, name = 'x',  parent.path = file.path(tmpdir, "task1"),aliasname = 'a1' );
@@ -150,7 +153,7 @@ testf13<-function(tmpdir)
 testf14<-function(tmpdir)
 {
   #Task that has more than one source file and a side effect
-  folder<-tempdir()
+  folder<-tmpdir
   code<-c(paste0("writeLines('123','", file.path(folder,'testf14.tmp'), "')"),
           "source('aux.R', local=TRUE)")
   m<-depwalker:::create.metadata(code, file.path(tmpdir,"task14"))
@@ -175,7 +178,7 @@ testf16<-function(tmpdir)
 {
   #Task that has more than one source file and a side effect
   folder<-tempdir()
-  code<-"x<-digest::digest('../customdep.bin', algo='crc32', file=TRUE)"
+  code<-"x<-digest::digest('../../customdep.bin', algo='crc32', file=TRUE)"
   m<-depwalker:::create.metadata(code, file.path(tmpdir,"task16"))
   m<-depwalker:::add.objectrecord(m,"x",file.path(tmpdir, "x"));
   towrite<-as.raw(rep(0,16384))
@@ -210,5 +213,18 @@ testf18<-function(tmpdir)
   code<-"fileConn<-file('test18_side_effect.txt');writeLines(c('Hello World'), fileConn);close(fileConn);Sys.sleep(1);a<-1";
   m<-depwalker:::create.metadata(code, file.path(tmpdir,"task18"))
   m<-depwalker:::add.objectrecord(m,"a",file.path(tmpdir, "a"));
+  depwalker:::make.sure.metadata.is.saved(m);m
+}
+
+testf19<-function(tmpdir)
+{
+  #Object that imports more than one object from a single parent
+
+  m2<-testf8(tmpdir); #More than 1 object exported
+
+  code<-"t19<-exists('ans1') + exists('ans2')";
+  m<-depwalker:::create.metadata(code, file.path(tmpdir, "task19"));
+  m<-depwalker:::add.parent(metadata = m,  parent = m2 );
+  m<-depwalker:::add.objectrecord(metadata=m, name="t19");
   depwalker:::make.sure.metadata.is.saved(m);m
 }

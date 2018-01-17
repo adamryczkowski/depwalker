@@ -164,7 +164,9 @@ unload.objects<-function(parentrecords, envir=NULL)
   }
   for (parentrecord in parentrecords)
   {
-    assign(parentrecord$name,NULL,envir=envir)
+    if(parentrecord$name %in% names(envir)) {
+      rm(parentrecord$name, envir = envir)
+    }
   }
 }
 

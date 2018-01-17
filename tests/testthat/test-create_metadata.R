@@ -1,14 +1,14 @@
 context("Creation of task's metadata")
 library(depwalker)
-
+library(testthat)
 #source('tests/testthat/testfunctions.R')
 
 source('testfunctions.R')
 
 test_that("Test create metadata (1)", expect_equal_to_reference({
-    tmpdir<-'/tmp';
+    tempdir<-'/tmp';
     code<-"x<-1:10";
-    depwalker:::create.metadata(code, file.path(tmpdir,"task1"))
+    depwalker:::create.metadata(code, file.path(tempdir,"task1"))
   }, 'metadata1_pre.rds'))
 
 test_that("Test for digest equivalence of metadata", expect_equal({
@@ -20,8 +20,8 @@ test_that("Test for digest equivalence of metadata", expect_equal({
 ))
 
 test_that("Test for adding object record (1)", expect_equal_to_reference({
-  tmpdir<-'/tmp';
-  testf1(tmpdir);
+  tempdir<-'/tmp';
+  testf1(tempdir);
 },"metadata1.rds"))
 
 test_that("Test for adding another object record (1)", expect_warning({
@@ -35,13 +35,13 @@ test_that("Save and read simple metadata (1)", {
     m<-readRDS('metadata1.rds');
     depwalker:::make.sure.metadata.is.saved(m);
     m2<-depwalker:::load.metadata(m$path);
-    expect_equal(depwalker:::metadata.digest(m),depwalker:::metadata.digest(m2))
+    testthat::expect_equal(depwalker:::metadata.digest(m),depwalker:::metadata.digest(m2))
 })
 
 test_that("Test add parent to metadata (2)", {
   m<-testf2(tmpdir);
   m2<-depwalker:::load.metadata(file.path(tmpdir, "task2"));
-  expect_true(depwalker:::are.two.metadatas.equal(m,m2))
+  testthat::expect_true(depwalker:::are.two.metadatas.equal(m,m2))
 })
 
 test_that("Test add parent to metadata with alias (3)", {

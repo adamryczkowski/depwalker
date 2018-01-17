@@ -93,6 +93,7 @@
 #'       task results are valid.}
 #' \item{flag.binary}{Flag. If set, contents of the file will be treated as binary and checksummed as such. Otherwise they will be
 #'       checkusmmed like source files, line-by-line to avoid Linux/Mac/Windows end-of-line character confussion.}
+#' \item{flag.r}{Flag. If set, contents of the file will be treated as R source and formatted in the logs accordingly.}
 #' }
 #'
 #' \strong{Description of the \code{parentrecord} item}:

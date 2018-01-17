@@ -187,26 +187,20 @@ get.objectrecord.by.parentrecord<-function(parentrecord, metadata)
 #'  \describe{
 #'  \item{\code{path}}{path to the metadata}
 #'  \item{\code{names}}{character vector with names of exported objects from this metadata}
-#'  \item{\code{aliasnames}}{optional: character vector of the names used by our script}
+#'  \item{\code{aliasnames}}{character vector of the names used by our script}
 #'  }
 sort.parentrecords<-function(metadata)
 {
   ans<-list()
   for(p in metadata$parents)
   {
-    if (!is.null(p$aliasname))
-    {
-      an<-p$aliasname
-    } else {
-      an<-p$name
-    }
     if (is.null(ans[p$path]))
     {
-      ans[[p$path]]<-list(path=p$path, names=p$name, aliasnames=an)
+      ans[[p$path]]<-list(path=p$path, names=p$name, aliasnames=p$aliasname)
     } else
     {
       ans[[p$path]]$names<-c(ans[p$path]$names, p$name)
-      ans[[p$path]]$aliasnames<-c(ans[p$path]$aliasnames, an)
+      ans[[p$path]]$aliasnames<-c(ans[p$path]$aliasnames, p$aliasname)
       ans[[p$path]]$path<-p$path
     }
   }

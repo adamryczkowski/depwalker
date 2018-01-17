@@ -82,6 +82,7 @@ assertMetadata<-function(metadata)
       checkmate::assert_file_exists(get.codepath(metadata, extrasource$path))
       checkmate::assert_flag(extrasource$flag.checksum)
       checkmate::assert_flag(extrasource$flag.binary)
+      checkmate::assert_flag(extrasource$flag.r)
     }
   }
   if (!is.null(metadata$codeCRC))
@@ -105,7 +106,8 @@ assertDigest<-function(digest)
 
 assertParentRecordMetadata<-function(parentrecord, metadata)
 {
-  assertVariableName(parentrecord$name)
+  assertVariableNames(parentrecord$name)
+  assertVariableNames(parentrecord$aliasname)
   path=get.parentpath(parentrecord, metadata)
   assertValidPath(path)
   if (!is.null(parentrecord$digest))

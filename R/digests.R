@@ -198,19 +198,23 @@ objects.digest<-function(metadata)
 #' 2. aliasname of the imported object as it is used by us
 parents.digest<-function(metadata)
 {
-  parentnames<-sapply(metadata$parents, function(x) {if(is.null(x$aliasname)) {x$name;} else {x$aliasname;}})
+  if(length(metadata$parents)>0) {
+    parentnames<-names(metadata$parents)
 
-  idx<-order(parentnames)
-  single.parent.digest<-function(idx)
-  {
-    p<-metadata$parents[[idx]]
-    if (is.null(p$aliasname))
-      return(paste0(p$path, "|", p$name))
-    else
-      return(paste0(p$path, "|", p$name,"|",p$aliasname))
+
+    idx<-order(parentnames)
+    single.parent.digest<-function(idx)
+    {
+      p<-metadata$parents[[idx]]
+      names<-paste0(p$name, collapse=",")
+      anames<-paste0(p$aliasname, collapse=",")
+      return(paste0(p$path, "|", names, "|", anames ))
+    }
+    parents<-sapply(idx, single.parent.digest)
+    parents<-paste0(parents, collapse = ' ')
+  } else {
+    parents<-''
   }
-  parents<-sapply(idx, single.parent.digest)
-  parents<-paste0(parents, collapse = ' ')
   d<-digest::digest(parents,serialize=FALSE)
   return(d)
 }

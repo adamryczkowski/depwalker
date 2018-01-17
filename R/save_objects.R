@@ -53,8 +53,8 @@ save.object<-function(
   objectrecord$mtime<-NULL
   objectrecord$filesize<-NULL
   objectrecord$filedigest<-NULL
-#  metadata$objectrecords[[objectrecord$name]]<-objectrecord
-#  metadata<-save.metadata(metadata=metadata) #Najpierw zapisujemy metadane, choćby częściowe. O tym, że obiekt jeszcze nie jest dostępny, klienci odczytają na podstawie istniejącego pliku .lock
+  #  metadata$objectrecords[[objectrecord$name]]<-objectrecord
+  #  metadata<-save.metadata(metadata=metadata) #Najpierw zapisujemy metadane, choćby częściowe. O tym, że obiekt jeszcze nie jest dostępny, klienci odczytają na podstawie istniejącego pliku .lock
   filename<-paste0(get.objectpath(objectrecord = objectrecord, metadata = metadata), getOption('object.save.extension'))
 
   # assign('.tmp',metadata.path,envir=.GlobalEnv)
@@ -84,8 +84,8 @@ save.object<-function(
   objectrecord$filesize<-bit64::as.integer64(file.info(filename)$size)
   if (flag.check.md5sum)
     objectrecord$filedigest<-as.character(tools::md5sum(filename))
-#  metadata$objectrecords[[objectrecord$name]]<-objectrecord
-#  save.metadata(metadata=metadata) #
+  #  metadata$objectrecords[[objectrecord$name]]<-objectrecord
+  #  save.metadata(metadata=metadata) #
   return(objectrecord)
 }
 
@@ -236,13 +236,13 @@ save.objects<-function(
   {# nocov start
     newobjectrecords<-tryCatch(
       parallel::mclapply(objectrecords,
-                       function(objectrecord)
-                       {
-                         save.object(metadata=metadata,
-                                     objectrecord=objectrecord,
-                                     envir=envir,
-                                     flag.check.md5sum=flag.check.md5sum)
-                       }),
+                         function(objectrecord)
+                         {
+                           save.object(metadata=metadata,
+                                       objectrecord=objectrecord,
+                                       envir=envir,
+                                       flag.check.md5sum=flag.check.md5sum)
+                         }),
       error=function(e) {class(e)<-'try-error';e})
     # nocov end
 
@@ -250,15 +250,16 @@ save.objects<-function(
   if (!flag.save.in.background || 'try-error' %in% attr(newobjectrecords,'class'))
   {
     newobjectrecords<-lapply(objectrecords,
-             function(objectrecord)
-             {
-               save.object(metadata=metadata,
-                           objectrecord=objectrecord,
-                           envir=envir,
-                           flag.check.md5sum=flag.check.md5sum)
-               })
+                             function(objectrecord)
+                             {
+                               save.object(metadata=metadata,
+                                           objectrecord=objectrecord,
+                                           envir=envir,
+                                           flag.check.md5sum=flag.check.md5sum)
+                             })
   }
   metadata$objectrecords<-newobjectrecords
   save.metadata(metadata)
   return(metadata)
 }
+
