@@ -1,19 +1,27 @@
 print_m<-function(m) {
-  basename('/home/Adama-docs/Adam/MyDocs/Statystyka/Maszyny/Dab2/depwalker')
   txt<-paste0("Task ", basename(m$path))
   if(length(m$objectrecords)==0) {
     txt<-paste0(txt, " generating no objects")
   } else {
-    obj_txt<-format_objectrecs(m)
+    obj_txt<-depwalker:::format_objectrecs(m)
     txt<-paste0(txt, " generating ", obj_txt)
   }
   txt<-paste0(txt, '\n')
-  obj_code<-formatted_source(m$code)
-  if(length(obj_code)>0) {
-    txt<-paste0(txt, '```\n', obj_code, '\n```\n')
+
+  if(length(m$parents)>0) {
+    txt<-paste0(txt, "\nDependencies:\n", depwalker:::format_parents(m), '\n')
   }
 
+  obj_code<-depwalker:::formatted_source(m$code)
+  if(length(obj_code)>0) {
+    txt<-paste0(txt, '\n```\n', paste0(obj_code, collapse = '\n'), '\n```\n')
+  }
 
+  if(m$execution.directory!='') {
+    txt<-paste0(txt, 'execution directory: ', m$execution.directory)
+  }
+
+  return(txt)
 }
 
 formatted_source<-function(code, flag.include.comments=FALSE, width.cutoff=getOption("width"), max_length=30) {
@@ -42,11 +50,37 @@ format_objectrec<-function(m, or) {
 }
 
 format_parents<-function(m) {
-  parents<-purrr::map_chr(m$parents, ~.$task)
+  ps<-data.table(name=rep(NA_character_, length(m$parents)),
+                 objects=rep(NA_character_, length(m$parents)))
+  for(i in seq(1, length(m$parents))) {
+    p<-m$parents[[i]]
+    data.table::set(ps, i, 'name', m$parents[[i]]$path)
+    objects<-depwalker:::format_parent(m, p)
+    data.table::set(ps, i, 'objects', objects)
+  }
+  setattr(ps$name, 'decoration','')
+  setattr(ps$objects, 'decoration','')
+  ans<-danesurowe::format_item_list_en(ps, txt_attribute_bare_quote ='')
+
+  return(ans)
 }
 
 format_parent<-function(m, p) {
-
+#  txt<-paste0(p$path, ': ')
+  txt<-''
+  if(length(p$name)>0) {
+    os<-rep(NA_character_, length(p$name))
+    for(i in seq(1, length(p$name))) {
+      if(p$aliasname[[i]]!=p$name[[i]]) {
+        os[[i]]<-paste0(p$name[[i]], "->", p$aliasname[[i]])
+      } else {
+        os[[i]]<-p$name[[i]]
+      }
+    }
+    ans<-danesurowe::format_item_list_en(os, txt_separator_last=', ')
+    txt<-paste0(txt, ans)
+  }
+  return(txt)
 }
 
 format_objectrecs<-function(m) {
@@ -62,9 +96,14 @@ format_objectrecs<-function(m) {
       data.table::set(ors, i, 'size', or$size_txt)
     }
 
-    ors<-dplyr::select(dplyr::arrange(ors, -size_num), -size_num)
+    if(all(is.na(ors$size_num))) {
+      ors<-dplyr::select(ors, -size_num, -size)
+    } else {
+      ors<-dplyr::select(dplyr::arrange(ors, -size_num), -size_num)
+      setattr(ors$size, 'decoration','')
+    }
+
     setattr(ors$txt, 'decoration','')
-    setattr(ors$size, 'decoration','')
     ans<-danesurowe::format_item_list_en(ors, txt_attribute_bare_quote ='')
 
   } else {

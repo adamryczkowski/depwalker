@@ -56,6 +56,7 @@ test_that("Calculation of object with forced multiple dependencies (3)", expect_
 test_that("Testing for parallel execution of parents (7)", expect_equal({
 #  unlink(file.path(tmpdir,'*.rds'))
 #  unlink(file.path(tmpdir,'pre_task*'))
+#  source('testfunctions.R')
 
   m<-testf7(tmpdir);
   env<-new.env()
@@ -68,7 +69,7 @@ test_that("Testing for parallel execution of parents (7)", expect_equal({
 
   #Run again - this time in parallel
   t2<-system.time(ans<-depwalker:::get.object(metadata=m))
-  if (t2['elapsed']*2 > t['elapsed'])
+  if (t2['elapsed']*1.8 > t['elapsed'])
   {
     stop("Parallel evaluation didn't happen")
   }

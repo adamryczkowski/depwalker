@@ -228,3 +228,7 @@ testf19<-function(tmpdir)
   m<-depwalker:::add.objectrecord(metadata=m, name="t19");
   depwalker:::make.sure.metadata.is.saved(m);m
 }
+
+testf20<-function(tmpdir) {
+  #Create a simple task using high level interface
+}

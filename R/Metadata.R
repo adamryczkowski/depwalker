@@ -11,6 +11,7 @@ ObjectMetadata<-R6::R6Class(
     #Saves the metadata
     save = function() {
       make.sure.metadata.is.saved(private$m)
+      NULL
     },
     add_parent=function(parent=NULL, name=NULL, aliasname=NULL, flag_remember_absolute_path=FALSE) {
       if('character' %in% class(parent)) {
@@ -70,6 +71,12 @@ ObjectMetadata<-R6::R6Class(
                       flag.check.object.digest=flag.check.object.digest,
                       flag.ignore.mtime=flag.ignore.mtime)
       return(ans)
+    },
+    print=function() {
+      cat(depwalker:::print_m(private$m))
+    },
+    dump_data=function() {
+      metadata.dump(private$m$path)
     }
   ),
   active = list(
