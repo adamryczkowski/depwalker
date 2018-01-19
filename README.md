@@ -58,3 +58,10 @@ This function starts where load.objects.by.metadata left off. It knows the curre
 Iterates over all parents (ancestors) and inserts their objects into the environment
 
 
+TODO:
+
+1. Upewnij się, że w metadatnych są 4 hashe: 1 - hash kodu OK, 2 - hash nazw obiektów runtime (TODO), 3 - hash każdej wartości każdego obiektu (OK)
+2. Niech interfejs będzie miał funkcję "Is cached value clean", która zwróci powody, dlaczego cached value jest złe.
+OK 3. Dodaj parametr "run.environment", który będzie zawierał obiekty implicite wykorzystywane przez nasz obiekt
+OK 4. Niech run.environment może być również listą
+5. Niech kod może być podany również jako funkcja. Wówczas do kodu dodamy również wszystkie funkcje wywoływane przez nią, rekurencyjnie

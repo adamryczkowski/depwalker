@@ -39,6 +39,7 @@ assertMetadata<-function(metadata)
 {
   checkmate::assertList(metadata$objectrecords)
   checkmate::assertPathForOutput(metadata$path, overwrite=TRUE)
+  checkmate::assert_environment(metadata$runtime.environment)
   if (!is.null(metadata$codepath))
     checkmate::assert_file_exists(get.codepath(metadata))
   a<-assertCode(metadata$code)
@@ -50,6 +51,7 @@ assertMetadata<-function(metadata)
   {
     assertObjectRecordMetadata(objectrecord, metadata)
   }
+  checkmate::assertList(metadata$parents)
   for (parentrecord in metadata$parents)
   {
     assertParentRecordMetadata(parentrecord, metadata)
@@ -61,7 +63,13 @@ assertMetadata<-function(metadata)
     assertValidPath(path)
   }
 
-  checkmate::assertList(metadata$parents)
+
+  if('inputobjects' %in% names(metadata)) {
+    checkmate::assertList(metadata$inputobjects)
+    for(inputobject in metadata$inputobjects) {
+      assertInputObjectMetadata(inputobject, metadata)
+    }
+  }
   if (!is.null(metadata$flag.never.execute.parallel))
     checkmate::assertFlag(metadata$flag.never.execute.parallel)
   if (!is.null(metadata$flag.update.cost.statistics))
@@ -75,7 +83,7 @@ assertMetadata<-function(metadata)
     if (!all(cols %in% colnames(metadata$timecosts)))
       stop("Insufficient columns in metadata$timecosts data.frame")
   }
-  if (!is.null(metadata$extrasources))
+  if ('extrasources' %in% names(metadata))
   {
     for (extrasource in metadata$extrasources)
     {
@@ -102,6 +110,39 @@ assertFileExists<-function(path)
 assertDigest<-function(digest)
 {
   checkmate::assertString(digest, pattern = '^[0-9a-f]{32}$')
+}
+
+assertDigests<-function(digests)
+{
+  for(digest in digests) {
+    assertDigest(digest)
+  }
+}
+
+
+assertInputObjectMetadata<-function(inputrecord, metadata)
+{
+  assertVariableNames(inputrecord$name)
+
+  path=get.inputobjectpath(inputrecord, metadata)
+  assertValidPath(path)
+
+  checkmate::assert_logical(inputrecord$ignored)
+
+  checkmate::assertChoice(inputrecord$compress, c('xz','gzip','bzip2',FALSE))
+
+  assertDigests(inputrecord$objectdigest)
+
+  if (!is.null(inputrecord$filedigest) || !is.null(inputrecord$mtime)) {
+    assertDigest(inputrecord$filedigest)
+    assertMtime(inputrecord$mtime)
+    assertInt64(inputrecord$filesize)
+  }
+
+  for(size in inputrecord$size){
+    assertInt64(size)
+  }
+
 }
 
 assertParentRecordMetadata<-function(parentrecord, metadata)
@@ -138,7 +179,7 @@ assertObjectRecordMetadata<-function(objectrecord, metadata)
   if (!is.null(objectrecord$size))
     assertInt64(objectrecord$size)
   if (!is.null(objectrecord$objectdigest))
-    assertDigest(objectrecord$objectdigest)
+    assertDigests(objectrecord$objectdigest)
 }
 
 assertTimeEstimation<-function(te)

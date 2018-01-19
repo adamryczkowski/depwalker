@@ -71,6 +71,13 @@ get.objectpath<-function(objectrecord, metadata=NULL, metadata.path=NULL)
   return(pathcat::path.cat(dirname(metadata.path), objectrecord$path))
 }
 
+#Gives a full path made from relative path and the metadata path
+get.fullpath<-function(metadata, path)
+{
+  return(pathcat::path.cat(dirname(metadata.path), path))
+}
+
+
 #' Returns specific subset of objectrecords
 #' @param metadata Task's metadata
 #' @param objnames Character vector with names of objects for which we want to
@@ -93,6 +100,8 @@ are.two.metadatas.equal<-function(m1, m2)
   return(metadata.digest(m1)==metadata.digest(m2))
 }
 
+#Add some extra information present in extra_m into the base_m, retaining the
+#log and statistics of the base_m, and any other automatically-added info, like CRC or mtimes.
 join.metadatas<-function(base_m, extra_m)
 {
   #Two metadatas have the same digest - i.e. they agree on:
@@ -102,7 +111,7 @@ join.metadatas<-function(base_m, extra_m)
 
   dirty=FALSE
 
-  fnupdate<-function(name)
+  fnupdate<-function(name, base_m, extra_m)
   {
     if (!is.null(extra_m[[name]]))
     {
@@ -121,32 +130,22 @@ join.metadatas<-function(base_m, extra_m)
     return(FALSE)
   }
 
+
+  dirty<-fnupdate('codepath', base_m, extra_m)
+  dirty<-dirty || fnupdate('flag.never.execute.parallel', base_m, extra_m)
+  dirty<-dirty || fnupdate('flag.force.recalculation', base_m, extra_m)
+  dirty<-dirty || fnupdate('execution.directory', base_m, extra_m)
+
+
   join_objectrecords<-function(base_o, extra_o)
   {
     dirty<-FALSE
-    fnupdate<-function(name)
-    {
-      if (!is.null(extra_o[[name]]))
-      {
-        if (extra_o[[name]] != base_o[[name]])
-        {
-          base_o[[name]]<<-extra_o[[name]]
-          return(TRUE)
-        }
-      }
-      return(FALSE)
-    }
-    dirty <- dirty || fnupdate('path')
-    dirty <- dirty || fnupdate('compress')
+    dirty <- dirty || fnupdate('path', base_o, extra_o)
+    dirty <- dirty || fnupdate('compress', base_o, extra_o)
     return(dirty)
   }
-
-
-  dirty<-fnupdate('codepath')
-  dirty<-dirty || fnupdate('flag.never.execute.parallel')
-  dirty<-dirty || fnupdate('flag.force.recalculation')
-
-  for (i in seq_along(base_m$objectrecords))
+  for (i in seq_along(base_m$objectrecords)) #We can assume that number of objectrecords match,
+    #otherwise two metadatas would not be equivalent
   {
     base_o <- base_m$objectrecords[[i]]
     extra_o <- extra_m$objectrecords[[i]]
@@ -156,6 +155,46 @@ join.metadatas<-function(base_m, extra_m)
       dirty<-TRUE
     }
   }
+
+
+  join_extrasources<-function(base_o, extra_o)
+  {
+    dirty<-FALSE
+    dirty <- dirty || fnupdate('flag.checksum', base_o, extra_o)
+    dirty <- dirty || fnupdate('flag.r', base_o, extra_o)
+    return(dirty)
+  }
+  for (i in seq_along(base_m$extrasources)) #We can assume that number of extrasources match,
+    #otherwise two metadatas would not be equivalent
+  {
+    base_o <- base_m$extrasources[[i]]
+    extra_o <- extra_m$extrasources[[i]]
+    if (join_extrasources(base_o, extra_o))
+    {
+      base_m$extrasources[[i]]<-extra_o
+      dirty<-TRUE
+    }
+  }
+
+
+  join_inputobjects<-function(base_o, extra_o)
+  {
+    dirty<-FALSE
+    dirty <- dirty || fnupdate('compress', base_o, extra_o)
+    return(dirty)
+  }
+  for (i in seq_along(base_m$inputobjects)) #We can assume that number of extrasources match,
+    #otherwise two metadatas would not be equivalent
+  {
+    base_o <- base_m$inputobjects[[i]]
+    extra_o <- extra_m$inputobjects[[i]]
+    if (join_inputobjects(base_o, extra_o))
+    {
+      base_m$inputobjects[[i]]<-extra_o
+      dirty<-TRUE
+    }
+  }
+
   if (dirty)
   {
     return(base_m)
@@ -285,3 +324,31 @@ normalize_code_string<-function(code)
   code<-unlist(strsplit(code,'\n')) #Makes sure each line is in separate element
   return(code)
 }
+
+lists_to_df<-function(l, list_columns=character(0)) {
+  cns<-names(l[[1]])
+  nrow<-length(l)
+
+  dt<-data.table(..delete=rep(NA, nrow))
+  for(cn in cns) {
+    if(cn %in% list_columns) {
+      val<-list(list())
+    } else {
+      val<-l[[1]][[cn]]
+      val[[1]]<-NA
+    }
+    dt[[cn]]<-rep(val, nrow)
+  }
+  for(i in seq(1, nrow)) {
+    for(cn in cns) {
+      val<-l[[i]][[cn]]
+      if(cn %in% list_columns) {
+        val<-list(list(val))
+      }
+      set(dt, i, cn, val)
+    }
+  }
+  dt[,..delete:=NULL]
+  return(dt)
+}
+

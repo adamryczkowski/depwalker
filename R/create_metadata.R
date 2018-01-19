@@ -42,7 +42,9 @@ create.metadata<-function(code=NULL, metadata.path, flag.never.execute.parallel=
   checkmate::assertFlag(flag.never.execute.parallel)
 
 
-  metadata<-list(code=code, path=metadata.path, parents=list(), objectrecords=list(), flag.never.execute.parallel=flag.never.execute.parallel, flag.force.recalculation=FALSE, execution.directory=execution.directory)
+  metadata<-list(code=code, path=metadata.path, parents=list(), objectrecords=list(), inputobjects=list(),
+                 flag.never.execute.parallel=flag.never.execute.parallel,
+                 flag.force.recalculation=FALSE, execution.directory=execution.directory)
   codeCRC<-calculate_code_digest(metadata)
   metadata$codeCRC<-codeCRC
 
@@ -271,3 +273,110 @@ append_extra_code<-function(metadata, filepath, flag.checksum, flag.binary, flag
   metadata$extrasources<-extrasources
   return(metadata)
 }
+
+
+#' Add additional objects to be available when the task is run. Objects will be serialized to disk when
+#' metadata is saved.
+#' By default all small objects will kept together, and large objects will live in a separate files.
+#'
+#' @param metadata already created metadata you wish to add the source file to. You can create task's metadata from scratch with \code{\link{create.metadata}}.
+#' @param objects Either list or environment with the objects.
+#' @param forced_save_filenames List or named character vector that forces save of the specific object (given in key) into the filepath given in value.
+#'        It overrides the built in algorithm of naming and grouping the objects together in the serialized archives.
+#' @param save_location Path to the alternate save location. By default the save location is the same as
+#'        save location of the metadata objects, when only one file will be created, and subdirectory
+#'        \code{<task_name>_runtime_objects} when more than one file will be automatically created.
+#' @param forced_separate_files Character vector with the list of objects that will be forcefully serialized
+#'        into a separate, dedicated archive
+#' @param compress Compress method to use. Defaults to gzip.
+#' @param .ignored_objects Expert argument. Character vector with the list of objects present
+#'        in the \code{objects} argument, but which presence will not be tracked and saved.
+#'        The code must be written in such a way, that it doesn't rely on the existance and validity
+#'        of this object, e.g. this object can be used to speed things up.
+#' @return modified \code{metadata} argument that includes additional runtime objects definition. Nothing will get
+#'        actually saved to disk (for this use make.sure.metadata.is.saved)
+#' @export
+#' @seealso \code{\link{create.metadata}}, \code{\link{add.parent}}
+#' @export
+add_runtime_objects<-function(metadata, objects, save_location=NULL, forced_save_filenames=character(0),
+                              forced_separate_files, compress='gzip', .ignored_objects=character(0))
+{
+  if('list' %in% class(objects)) {
+    objects<-as.environment(objects)
+  }
+  if(!'inputobjects' %in% names(metadata)) {
+    metadata$inputobjects<-list()
+  }
+
+
+  #First we add ignored objects, as there is the least amount of work to do with them
+  objectnames<-intersect(names(objects), .ignored_objects)
+  if(length(objectnames)>0) {
+    for(on in objectnames) {
+      metadata$inputobjects[[on]]<-list(name=on, ignored=TRUE)
+    }
+  }
+
+  #Now we focus on the non-ignored objects
+  objectnames<-setdiff(names(objects), .ignored_objects)
+
+  objectsizes<-purrr::map_dbl(objectnames, ~object.size(objects[[.]]))
+
+  #Objects bigger than 5kb will be put in the separate containers.
+  #separate_containers is a flag for each object specifying whether to use a separate container for it.
+  separate_containers<-objectnames %in% c(names(forced_save_filenames), forced_separate_files) |
+                       objectsizes > getOption('tune.threshold_objsize_for_dedicated_archive')
+
+  number_of_files<-sum(separate_containers)
+
+  if(number_of_files==0) {
+    generic_file_name<-paste0(basename(metadata$path), "_runtime_objects.rds")
+  } else {
+    generic_file_name<-paste0(basename(metadata$path), "_runtime_objects/default_container.rds")
+    separate_objects<-objectnames[separate_containers]
+    separate_paths<-paste0(basename(metadata$path), "_runtime_objects/_", separate_objects, ".rds")
+    if(length(forced_separate_files)>0) {
+      for(i in seq(1, length(forced_separate_files))) {
+        obj_name<-names(forced_separate_files)[[i]]
+        if(obj_name %in% names(forced_separate_files)){
+          path<-forced_separate_files[[obj_name]]
+          pos<-which(obj_name == separate_objects)
+          separate_paths[[pos]]<-path
+        }
+      }
+    }
+  }
+  jobs<-list()
+
+  if(any(!separate_containers)) {
+    #Create entries for each small object in the shared container
+    relative_path<-path=pathcat::make.path.relative(metadata$path, generic_file_name)
+    objnames<-objectnames[which(!separate_containers)]
+    objsizes<-objectsizes[which(!separate_containers)]
+    objdigests<-purrr::map_chr(objnames, ~digest::digest(objects[[.]]))
+
+    metadata$inputobjects[[relative_path]]<-list(name=objnames, ignored=FALSE,
+                                      path=relative_path,
+                                      compress=compress, objectdigest=objectdigest,
+                                      size=objsizes)
+  }
+  if(any(separate_containers)) {
+    poss<-which(separate_containers)
+    for(pos in poss) {
+      objectname<-objectnames[[pos]]
+      objsize<-objectsizes[[pos]]
+      relative_path<-path=pathcat::make.path.relative(metadata$path, separate_paths)
+      objdigest<-digest::digest(objects[[objectname]])
+
+
+      metadata$inputobjects[[relative_path]]<-list(name=objnames, ignored=FALSE,
+                                        path=relative_path,
+                                        compress=compress, objectdigest=objectdigest,
+                                        size=objsize)
+    }
+  }
+
+  return(metadata)
+}
+
+

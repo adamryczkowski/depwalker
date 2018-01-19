@@ -101,8 +101,7 @@ save.object<-function(
 #' @param wait If set the function exits only after the object is available to read.
 #' @param fn_to_run_afters_save Function that will be run after save. The function will get a single argument - path to the
 #' newly created file
-#' @param flag_return_job
-#' @return parallel job with the backgroud save, if flag_return_job is set
+#' @return parallel job with the backgroud save, if wait is not 'none'
 #' @export
 save.large.object<-function(obj, file, compress='xz', wait_for=c('save','compress','none'),
                             flag_use_tmp_storage=FALSE, fn_to_run_after_save=NULL,
@@ -114,6 +113,9 @@ save.large.object<-function(obj, file, compress='xz', wait_for=c('save','compres
   if(is.null(parallel_cpus))
   {
     parallel_cpus<-parallel::detectCores()
+  }
+  if(parallel_cpus==0) {
+    wait_for<-'compress'
   }
   #Funkcja kompresuje plik po szybkim zapisaniu
   save_fn_stage2<-function(obj, file_from, file_to, compress, fn_to_run_after_compress, parallel_cpus, flag_return_job) {

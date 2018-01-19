@@ -75,6 +75,9 @@
 #' \item{\strong{parents}}{Dictionary with all parent task definitions. Dictionary key is base name of the task. }
 #' \item{\strong{objectrecords}}{Dictionary with registered objects produced by the main R script.
 #'       Dictionary key is the object name. }
+#' \item{\strong{inputobjects}}{Dictionary with all objects that are initialized on task creation, with contents saved
+#'       on disk and loaded and placed in the run environment when the task is about to be executed.}
+#' \item{runtime.environment}{Only runtime. Environment with loaded version of all or some objects defined in \code{inputobjects} member.}
 #' \item{\strong{execution.directory}}{String with the directory when the script should be run. Can be NULL (or absent),
 #'       or string with the directory. Directory can be absolute, or relative to the task's directory.
 #'       e.g. execution.directory equal '' will mean the task's main directory.}
@@ -99,8 +102,8 @@
 #' \strong{Description of the \code{parentrecord} item}:
 #' \describe{
 #' \item{\strong{path}}{Path (either absoulute or relative) to the imported task's metadata file.}
-#' \item{\strong{name}}{Name of the imported object.}
-#' \item{\strong{aliasname}}{Alternate name of the object, set if our script needs the object produced
+#' \item{\strong{name}}{Names of the imported objects.}
+#' \item{\strong{aliasname}}{Alternate names of each object, set if our script needs the object produced
 #'       by the imported task in different name.}
 #' }
 #'
@@ -113,6 +116,24 @@
 #' \item{compress}{Compression method. Currently the only methods supported are:
 #'       \code{xz}, \code{bzip2}, \code{gzip} and \code{false}}
 #' \item{objectdigest}{MD5 digest of this object when in R memory.}
+#' \item{filedigest}{MD5 digest of the compressed file with the saved object.}
+#' \item{size}{Size of the objects in bytes when in R memory. Usefull for memory usage optimization. }
+#' \item{filesize}{Size of the compressed file with the saved object. When size mismatches, there is no need to check for
+#'       MD5 hash.}
+#' \item{mtime}{Modification time of the compressed file with the saved object. When \code{mtime} mismatches, there is
+#'       no need to check for MD5 has.}
+#'}
+#'
+#' \strong{Description of the \code{inputobject} item}:
+#' \describe{
+#' \item{\strong{name}}{Names of objects in the run environment.}
+#' \item{ignored} A flag. If true, then object with this name will never be tracked and all the subsequent
+#'                elements will be ignored
+#' \item{path}{Path to the location with the saved contents of the object. Small objects will be saved together,
+#'             and each large object will have separate file}
+#' \item{compress}{Compression method. Currently the only methods supported are:
+#'       \code{xz}, \code{bzip2}, \code{gzip} and \code{false}}
+#' \item{objectdigest}{MD5 digests of objects when in R memory.}
 #' \item{filedigest}{MD5 digest of the compressed file with the saved object.}
 #' \item{size}{Size of the objects in bytes when in R memory. Usefull for memory usage optimization. }
 #' \item{filesize}{Size of the compressed file with the saved object. When size mismatches, there is no need to check for
@@ -135,7 +156,8 @@ NULL
     metadata.save.extension	=	".meta.yaml",
     lock.extension	=	'.lock',
     echo.extension	=	".log",
-    error.extension	=	'.err.log'
+    error.extension	=	'.err.log',
+    tune.threshold_objsize_for_dedicated_archive = 5000 #Results from `studium_save`. It will be 4×this size for 'xz'.
   )
   toset	<-	!(names(op.depwalker)	%in%	names(op))
   if(any(toset))	options(op.depwalker[toset])

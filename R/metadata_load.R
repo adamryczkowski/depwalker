@@ -41,6 +41,18 @@ load.metadata<-function(metadata.path)
       m$objectrecords[[i]]$mtime<-as.POSIXct(o$mtime, origin='1970-01-01')
   }
 
+  for(i in seq(along.with=m$inputobjects))
+  {
+    o<-m$inputobjects[[i]]
+    if (!is.null(o$size))
+      m$inputobject[[i]]$size<-bit64::as.integer64(o$size)
+    if (!is.null(o$filesize))
+      m$inputobject[[i]]$filesize<-bit64::as.integer64(o$filesize)
+    if (!is.null(o$mtime))
+      m$inputobject[[i]]$mtime<-as.POSIXct(o$mtime, origin='1970-01-01')
+  }
+  m$runtime.environment<-new.env()
+
   assertMetadata(m)
   return(m)
 }

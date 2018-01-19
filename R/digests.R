@@ -28,7 +28,6 @@
 #' \item names of all exported symbols
 #' }
 #' Everything else is ignored.
-#'
 #' @return string representing MD5 digest of the object in lowercase.
 #' @export
 metadata.digest<-function(metadata)
@@ -42,9 +41,15 @@ metadata.digest<-function(metadata)
   parents.digest<-parents.digest(metadata)
   code.digest<-calculate_code_digest(metadata)
   objects.digest<-objects.digest(metadata)
+  runtime.digest<-runtime.digest(metadata)
 
-  ans<-digest::digest(paste0(parents.digest,"><",code.digest, "><", objects.digest),serialize = FALSE)
-  assertDigest(ans)
+  if(flag_return_full) {
+    ans<-list(parents=parents.digest, code=code.digest, objects=objects.digest,runtime=runtime.digest )
+  } else {
+    ans<-digest::digest(paste0(parents.digest,"><",code.digest, "><", objects.digest),serialize = FALSE)
+    assertDigest(ans)
+  }
+
   return(ans)
 }
 
@@ -56,7 +61,7 @@ metadata.digest<-function(metadata)
 #' If there is only one line of code it returns digest of it.
 #'
 #' @param metadata Metadata of the object
-calculate_code_digest<-function(metadata)
+calculate_code_digest<-function(metadata, flag_return_full=FALSE)
 {
   files<-get_coding_files(metadata, flag_expand_paths = TRUE)
   if (is.null(files))
@@ -189,6 +194,39 @@ objects.digest<-function(metadata)
   objects<-paste0(objects, collapse = ' ')
   d<-digest::digest(objects, serialize=FALSE)
   checkmate::assertString(objects)
+  return(d)
+}
+
+#' Returns runtime environment's digest for testing equivalence of metadataas
+#' Digest uses object's save path and object names only
+#' @param metadata Task's metadata
+runtime.digest<-function(metadata)
+{
+  if(length(metadata$inputobjects)>0) {
+    df<-dplyr::arrange(
+      dplyr::select(
+        lists_to_df(
+          metadata$inputobjects,
+          list_columns = c('name', 'objectdigest', 'size')),
+        name, ignored, path),
+      -ignored, name)
+    ans<-''
+    for(i in seq(1, nrow(df))) {
+      name<-paste0(df$path[[i]], collapse=',')
+      if(i>1) {
+        ans<-paste0(ans, '|')
+      }
+      if(df$ignored) {
+        ans<-paste0(ans, ":", name)
+      } else {
+        ans<-paste0(ans, ":", df$path[[i]], "/",  name)
+      }
+    }
+  } else {
+    ans<-''
+  }
+  d<-digest::digest(ans, serialize=FALSE)
+  checkmate::assertString(ans)
   return(d)
 }
 
