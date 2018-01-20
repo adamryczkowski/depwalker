@@ -56,6 +56,7 @@
 #'     cache is consistent with the task's metafile description}
 #'   \item{\code{filesize}}{size of the cached file in bytes}
 #' }
+#'
 #' \strong{\code{parents}}
 #' \describe{
 #'   \item{\code{parentid}}{task's metadata ID, that links each row from this table with table \code{metadata}
@@ -65,6 +66,7 @@
 #'   \item{\code{aliasname}}{if present, it gives R's name of the parent's object that is
 #'    being used in the task's R script. This field gives flexibility in naming objects across tasks}
 #'   \item{\code{path}}{path to the parent's task's metadata}
+#'   \item{\code{digest}}{digest of the parent's definition. Filled only if the object has been ran.}
 #'  }
 #' \strong{\code{timecosts}}
 #'
@@ -214,6 +216,9 @@ metadata.one.dump<-function(metadata, id, flag.ignore.mtime, target.environment=
       }
       p$path=get.parentpath(parentrecord = m$parents[[i]],metadata=metadata)
       p$parentid<-id
+      if(is.null(p$digest)) {
+        p$digest<-NA_character_
+      }
       # if (i==1)
       # {
       #   dt<-data.table::as.data.table(p)

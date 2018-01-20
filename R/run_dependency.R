@@ -155,10 +155,16 @@ get.object<-function(
     return(NULL)
 }
 
-#' Hi level function, that reads objectnames under the names \code{aliasnames}.
+
+
+#' High level function, that reads objectnames under the names \code{aliasnames}.
 #'
 #' If \code{flag.estimate.only} is present, it returns the detailed execution tree and historic execution metrics
 #'  instead of executing the scripts.
+#'
+#' The function is there to decide whether to read the cached values instead of doing full task run.
+#'
+#'
 #' @param metadata.path Path to the task's metadata, that describe the task. Alternatively user can supply
 #' @param metadata The metadata object itself. It makes sure, that this metadata is saved to disk.
 #' @param objectnames List of objects to return. If omited, all objects registered in this metadata will be returned.
@@ -254,8 +260,11 @@ load.objects.by.metadata<-function(
     ans<-FALSE
   }
 
-  if (!flag.force.recalculation)
-  {
+  staleness<-is.cached.value.stale(metadata)
+  if(is.na(staleness)) {
+    staleness<-TRUE
+  }
+  if(staleness==FALSE && !flag.force.recalculation) {
     memobjects<-rep(FALSE,times=length(objrecs))
     for(i in 1:length(objrecs))
     {

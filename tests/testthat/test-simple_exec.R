@@ -1,9 +1,11 @@
 context("Execution of simple task")
-
+library(testthat)
 source('testfunctions.R')
+#source('tests/testthat/testfunctions.R')
 
 test_that("Run simple task (1)", expect_equal({
   testf1(tmpdir);
+  system(paste0('nemo ', tmpdir))
   m<-depwalker:::load.metadata(file.path(tmpdir, "task1"));
   if (exists('x',envir=.GlobalEnv))
     rm('x',envir=.GlobalEnv)

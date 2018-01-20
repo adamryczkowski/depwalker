@@ -2,6 +2,8 @@ sample(c(letters, LETTERS, 0:9), 15)
 tmpdir<-file.path(tempfile('depwalker.test.'), paste0(sample(c(letters, LETTERS, 0:9), 15),collapse=''))
 dir.create(tmpdir, showWarnings = FALSE, recursive = TRUE);
 
+system(paste0('nemo ', tmpdir))
+
 testf1<-function(tmpdir) {
   code<-"x<-1:10";
   m<-depwalker:::create.metadata(code, file.path(tmpdir,"task1"))

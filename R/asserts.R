@@ -39,7 +39,9 @@ assertMetadata<-function(metadata)
 {
   checkmate::assertList(metadata$objectrecords)
   checkmate::assertPathForOutput(metadata$path, overwrite=TRUE)
-  checkmate::assert_environment(metadata$runtime.environment)
+  if('runtime.environment' %in% names(metadata)) {
+    checkmate::assert_environment(metadata$runtime.environment)
+  }
   if (!is.null(metadata$codepath))
     checkmate::assert_file_exists(get.codepath(metadata))
   a<-assertCode(metadata$code)
@@ -90,6 +92,9 @@ assertMetadata<-function(metadata)
       checkmate::assert_file_exists(get.codepath(metadata, extrasource$path))
       checkmate::assert_flag(extrasource$flag.checksum)
       checkmate::assert_flag(extrasource$flag.binary)
+      if('digest' %in% names(extrasource)) {
+        assertDigest(extrasource$digest)
+      }
       checkmate::assert_flag(extrasource$flag.r)
     }
   }

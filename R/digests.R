@@ -43,47 +43,13 @@ metadata.digest<-function(metadata)
   objects.digest<-objects.digest(metadata)
   runtime.digest<-runtime.digest(metadata)
 
-  if(flag_return_full) {
-    ans<-list(parents=parents.digest, code=code.digest, objects=objects.digest,runtime=runtime.digest )
-  } else {
-    ans<-digest::digest(paste0(parents.digest,"><",code.digest, "><", objects.digest),serialize = FALSE)
-    assertDigest(ans)
-  }
+  ans<-digest::digest(paste0(parents.digest,"><",code.digest, "><", objects.digest),serialize = FALSE)
+  assertDigest(ans)
 
   return(ans)
 }
 
 
-#' Calculates R code component of the task's metadata.
-#'
-#' If there is more than one line of code, it calculates digest for each line separatedly,
-#' then digests the final digest of concatenation of all individual digests.
-#' If there is only one line of code it returns digest of it.
-#'
-#' @param metadata Metadata of the object
-calculate_code_digest<-function(metadata, flag_return_full=FALSE)
-{
-  files<-get_coding_files(metadata, flag_expand_paths = TRUE)
-  if (is.null(files))
-  {
-    digests<-calculate_one_digest(metadata$code)
-  } else {
-    digests<-plyr::aaply(files,1,source_file_digest)
-  }
-
-  files<-get_binary_files(metadata, flag_expand_paths = TRUE)
-  if (!is.null(files))
-  {
-    digests2<-plyr::aaply(as.character(files),1,tools::md5sum)
-    digests<-c(digests,digests2)
-  }
-  if (length(digests)>1)
-  {
-    return(digest::digest(paste0(digests,collapse=''), serialize = FALSE))
-  } else {
-    return(digests)
-  }
-}
 
 #' Returns all files with code in canonical order:
 #' first the main file,

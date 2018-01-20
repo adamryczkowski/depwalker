@@ -329,19 +329,26 @@ lists_to_df<-function(l, list_columns=character(0)) {
   cns<-names(l[[1]])
   nrow<-length(l)
 
+  nas<-list()
+
   dt<-data.table(..delete=rep(NA, nrow))
   for(cn in cns) {
     if(cn %in% list_columns) {
       val<-list(list())
+      nas[[cn]]<-NA
     } else {
       val<-l[[1]][[cn]]
       val[[1]]<-NA
+      nas[[cn]]<-val
     }
     dt[[cn]]<-rep(val, nrow)
   }
   for(i in seq(1, nrow)) {
     for(cn in cns) {
       val<-l[[i]][[cn]]
+      if(is.null(val)) {
+        val<-nas[[cn]]
+      }
       if(cn %in% list_columns) {
         val<-list(list(val))
       }

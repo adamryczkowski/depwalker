@@ -97,6 +97,7 @@
 #' \item{flag.binary}{Flag. If set, contents of the file will be treated as binary and checksummed as such. Otherwise they will be
 #'       checkusmmed like source files, line-by-line to avoid Linux/Mac/Windows end-of-line character confussion.}
 #' \item{flag.r}{Flag. If set, contents of the file will be treated as R source and formatted in the logs accordingly.}
+#' \item{digest}{Digest of this source file calculated either in binary or text mode}
 #' }
 #'
 #' \strong{Description of the \code{parentrecord} item}:
@@ -105,6 +106,8 @@
 #' \item{\strong{name}}{Names of the imported objects.}
 #' \item{\strong{aliasname}}{Alternate names of each object, set if our script needs the object produced
 #'       by the imported task in different name.}
+#' \item{digest}{Digest of the parent, filled when the object is run, to freeze the parent's state and react
+#'       when the parent has changed, invalidating our object}
 #' }
 #'
 #' \strong{Description of the \code{objectrecord} item}:

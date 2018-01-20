@@ -21,7 +21,7 @@ test_that("Test for digest equivalence of metadata", expect_equal({
 
 test_that("Test for adding object record (1)", expect_equal_to_reference({
   tempdir<-'/tmp';
-  testf1(tempdir);
+  m<-testf1(tempdir);
 },"metadata1.rds"))
 
 test_that("Test for adding another object record (1)", expect_warning({

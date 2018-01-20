@@ -83,6 +83,10 @@ create.objects<-function(
       return(NULL)
   }
 
+  #Next we load all runtime objects
+
+  load.runtime.objects(metadata, run.environment)
+
   #Now we execute the script
   ans<-run.script(metadata, names,estimation.only=estimation.only, run.environment=run.environment)
   if (flag.estimation.only)
@@ -184,4 +188,11 @@ create.objects<-function(
  # if (flag.do.gc)
 #    gc()
   return(metadata)
+}
+
+
+#function loads all runtime objects and places them into the run.environment
+load.runtime.objects<-function(metadata, run.environment) {
+  browser()
+  #TODO
 }

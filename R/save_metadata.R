@@ -34,11 +34,14 @@
 #' @seealso \code{\link{save.metadata}} - unconditionally saves task's metadata on disk.
 make.sure.metadata.is.saved<-function(metadata, flag.save.in.background=FALSE,
                                       flag_use_tmp_storage = FALSE,
-                                      parallel_cpus=NULL, flag_wait=FALSE, flag_check_hash=TRUE)
+                                      parallel_cpus=NULL, flag_wait=TRUE, flag_check_hash=TRUE)
 {
   assertMetadata(metadata)
   metadata.path<-metadata$path
   checkmate::assertPathForOutput(metadata.path, overwrite=TRUE)
+  if(!flag.save.in.background) {
+    parallel_cpus<-0
+  }
 
   if (file.exists(paste0(metadata.path,getOption('metadata.save.extension'))))
     metadata.disk<-load.metadata(metadata.path)
@@ -52,7 +55,7 @@ make.sure.metadata.is.saved<-function(metadata, flag.save.in.background=FALSE,
 
   if(is.null(metadata.disk))
   {
-    metadata<-save_metadata(metadata=metadata, flag.save.in.background=flag.save.in.background,
+    metadata<-save_metadata(m=metadata,
                             flag_use_tmp_storage = flag_use_tmp_storage, parallel_cpus = parallel_cpus,
                             flag_wait = flag_wait, flag_check_hash = flag_check_hash)
     return(metadata)
@@ -66,14 +69,14 @@ make.sure.metadata.is.saved<-function(metadata, flag.save.in.background=FALSE,
       metadata.new<-join.metadatas(base_m = metadata.disk, extra_m = metadata)
       if (!is.null(metadata.new))
       {
-        save_metadata(metadata=metadata.new, flag.save.in.background=flag.save.in.background,
+        save_metadata(m=metadata,
                       flag_use_tmp_storage = flag_use_tmp_storage, parallel_cpus = parallel_cpus,
                       flag_wait = flag_wait, flag_check_hash = flag_check_hash)
         return(metadata.new)
       }
       return(metadata.disk)
     } else {
-      metadata<-save_metadata(metadata=metadata, flag.save.in.background=flag.save.in.background,
+      metadata<-save_metadata(m=metadata,
                               flag_use_tmp_storage = flag_use_tmp_storage, parallel_cpus = parallel_cpus,
                               flag_wait = flag_wait, flag_check_hash = flag_check_hash)
       return(metadata)
@@ -151,32 +154,22 @@ save.metadata<-function(metadata)
   return(metadata)
 }
 
-#' Function called by make.sure.metadata.is.saved to save all the runtime objects stored in m
-#' By default all small objects will kept together, and large objects will live in a separate files.
-#'
-#' @param metadata already created metadata with 'runtime.environment' with all the objects to save.
-#' @param flag_use_tmp_storage If set, it will use temp (presumably fast) storage to save the uncompressed version
-#'        of objects fast, and only then it will compress it to the target location. Relevant if the target
-#'        location is slow (e.g. network share)
-#' @param parallel_cpus You can set it to override automatic resolution of parallel cores. If set to 0,
-#'        function will run in serial mode, and force flag_wait=TRUE.
-#' @param flag_wait If set, the function will wait until the object is serialized, and return a valid
-#'        metadata. Otherwise the save will be performed in the background, locking the metadata in the process.
-#' @param flag_check_hash When the object is already serialized, with this flag it check not check size and
-#'        mtime, but size and hash (md5) of the serialized object.
-#' @return Returns TRUE if successfull
-#' @export
-#' @seealso \code{\link{create.metadata}}, \code{\link{add.parent}}
-#
-save_metadata<-function(m, flag_use_tmp_storage = FALSE,
-                               parallel_cpus=NULL, flag_wait=FALSE, flag_check_hash=TRUE) {
+save_runtime_objects<-function(m, parallel_cpus=NULL, flag_wait=FALSE, flag_check_hash=TRUE) {
   if(!'runtime.environment' %in% names(m))
   {
-    return(TRUE)#Nothing to do
+    return(NULL)#Nothing to do
   }
   if(!'inputobjects' %in% names(m)) {
-    return(TRUE)#nothing to do
+    return(NULL)#nothing to do
   }
+
+  if(length(m$inputobjects)==0) {
+    return(NULL)
+  }
+  if(length(m$runtime.environment)==0) {
+    return(NULL)
+  }
+
   if(is.null(parallel_cpus))
   {
     parallel_cpus<-parallel::detectCores()
@@ -241,35 +234,66 @@ save_metadata<-function(m, flag_use_tmp_storage = FALSE,
       }
     }
   }
+  return(jobs)
+}
+
+#' Function called by make.sure.metadata.is.saved to save all the runtime objects stored in m
+#' By default all small objects will kept together, and large objects will live in a separate files.
+#'
+#' @param metadata already created metadata with 'runtime.environment' with all the objects to save.
+#' @param flag_use_tmp_storage If set, it will use temp (presumably fast) storage to save the uncompressed version
+#'        of objects fast, and only then it will compress it to the target location. Relevant if the target
+#'        location is slow (e.g. network share)
+#' @param parallel_cpus You can set it to override automatic resolution of parallel cores. If set to 0,
+#'        function will run in serial mode, and force flag_wait=TRUE.
+#' @param flag_wait If set, the function will wait until the object is serialized, and return a valid
+#'        metadata. Otherwise the save will be performed in the background, locking the metadata in the process.
+#' @param flag_check_hash When the object is already serialized, with this flag it check not check size and
+#'        mtime, but size and hash (md5) of the serialized object.
+#' @return Returns TRUE if successfull
+#' @export
+#' @seealso \code{\link{create.metadata}}, \code{\link{add.parent}}
+#
+save_metadata<-function(m, flag_use_tmp_storage = FALSE,
+                               parallel_cpus=NULL, flag_wait=FALSE, flag_check_hash=TRUE) {
+
+
+  jobs<-save_runtime_objects(m = m, parallel_cpus=parallel_cpus, flag_wait=flag_wait, flag_check_hash=flag_check_hash)
 
   fn_wait_and_save<-function(m, jobs, parallel_cpus) {
     #Funkcja zdejmująca blokadę i zapisująca metadane
-    parallel::mccollect(jobs, wait=TRUE)
-    ios<-list()
+    if(!is.null(jobs)) {
+      parallel::mccollect(jobs, wait=TRUE)
+      ios<-list()
 
-    update_metadata_obj<-function(m, objmeta) {
-      if(!is.null(objmeta$path)) {
-        path<-get.fullpath(m, objmeta$path)
-        objmeta$filesize<-file.size(path)
-        objmeta$mtime<-file.mtime(path)
-        if(flag_check_digest) {
-          objmeta$filedigest<-as.character(tools::md5sum(path))
+      update_metadata_obj<-function(m, objmeta) {
+        if(!is.null(objmeta$path)) {
+          path<-get.fullpath(m, objmeta$path)
+          objmeta$filesize<-file.size(path)
+          objmeta$mtime<-file.mtime(path)
+          if(flag_check_digest) {
+            objmeta$filedigest<-as.character(tools::md5sum(path))
+          }
         }
+        return(objmeta)
       }
-      return(objmeta)
+      if(parallel_cpus>0) {
+        ios<-parallel::mclapply(m$inputobjects, FUN=update_metadata_obj, mc.cores = parallel_cpus)
+      } else {
+        ios<-lapply(m$inputobjects, FUN=update_metadata_obj)
+      }
+      ios<-ios[order(names(ios))]
+      m$inputobjects<-ios
     }
-    if(parallel_cpus>0) {
-      ios<-parallel::mclapply(m$inputobjects, FUN=update_metadata_obj, mc.cores = parallel_cpus)
-    } else {
-      ios<-lapply(m$inputobjects, FUN=update_metadata_obj)
-    }
-    ios<-ios[order(names(ios))]
-    m$inputobjects<-ios
     depwalker:::save.metadata(m)
     return(m)
   }
   if(flag_wait) {
-    m<-fn_wait_and_save(m, list(), parallel_cpus)
+    if(is.null(jobs)) {
+      m<-fn_wait_and_save(m, NULL, parallel_cpus)
+    } else {
+      m<-fn_wait_and_save(m, list(), parallel_cpus)
+    }
     return(m)
   } else {
     job<-parallel::mcparallel(fn_wait_and_save(m, jobs, parallel_cpus))
