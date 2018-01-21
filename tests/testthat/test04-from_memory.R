@@ -9,13 +9,15 @@ test_that("Test getting task from R memory (1)", {
   #system(paste0('nemo ', tmpdir))
   m<-depwalker:::load.metadata(file.path(tmpdir, "task14"));
   env<-new.env()
-  depwalker:::load.object(metadata=m, metadata.path=file.path(tmpdir, "task14"),
-                          target.environment = env, flag.save.in.background = FALSE)
+  debugonce(depwalker:::is.cached.value.stale)
+  m<-depwalker:::load.object(metadata=m, metadata.path=file.path(tmpdir, "task14"),
+                             target.environment = env, flag.save.in.background = FALSE)
   testthat::expect_equal(env$x, 42)
   testthat::expect_true(file.exists(file.path(tmpdir, 'testf14.tmp')))
 
   unlink(file.path(tmpdir, 'testf14.tmp'))
   unlink(file.path(tmpdir, 'x.rds'))
+  debugonce(depwalker:::load.objects.by.metadata)
   depwalker:::load.object(metadata=m, metadata.path=file.path(tmpdir, "task14"), objectname="x",
                           target.environment = env, flag.save.in.background = FALSE)
   testthat::expect_false(file.exists(file.path(tmpdir, 'testf14.tmp')))

@@ -193,6 +193,26 @@ create.objects<-function(
 
 #function loads all runtime objects and places them into the run.environment
 load.runtime.objects<-function(metadata, run.environment) {
-  browser()
-  #TODO
+  if(!'inputobjects' %in% names(metadata)) {
+    return(NULL)
+  }
+  if(length(metadata$inputobjects)==0) {
+    return(NULL)
+  }
+  for(io in metadata$inputobjects) {
+    path<-depwalker:::get.fullpath(meatadata, io$path)
+    if(length(io$name)>1) {
+      tmp<-readRDS(path)
+      for(iname in io$name) {
+        if(iname %in% names(tmp)) {
+          assign(iname, tmp[[iname]], envir = run.environment)
+        } else {
+          warning(paste0(iname, " stored in ", path, " is not registered in the metadata"))
+        }
+      }
+    } else {
+      assign(io$name, readRDS(path), envir=run.environment)
+    }
+  }
+  return(NULL)
 }

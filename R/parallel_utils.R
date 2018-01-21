@@ -8,8 +8,11 @@ mangle.connection.name<-function(path, objectname)
 }
 
 # Halts execution until the lock is released, or lock expires.
-wait.for.lock<-function(path, timeout)
+wait.for.lock<-function(path, timeout=NULL)
 {
+  if(is.null(timeout)) {
+    timeout<-getOption('default.lock.time')
+  }
   lockfile<-paste0(path,getOption('lock.extension'))
   if (file.exists(lockfile))
   {
@@ -26,8 +29,11 @@ wait.for.lock<-function(path, timeout)
   }
 }
 
-lock.exists<-function(path, timeout) {
+lock.exists<-function(path, timeout=NULL) {
   lockfile<-paste0(path,getOption('lock.extension'))
+  if(is.null(timeout)) {
+    timeout<-getOption('default.lock.time')
+  }
   if (file.exists(lockfile))
   {
     t<-as.numeric(file.mtime(lockfile))
@@ -47,8 +53,12 @@ lock.exists<-function(path, timeout) {
 #' The file will have an extension getOption('lock.extension')
 #'
 #' @param path Location of the lock file
-create.lock.file<-function(path)
+create.lock.file<-function(path, timeout=NULL)
 {
+  if(is.null(timeout)) {
+    timeout<-getOption('default.lock.time')
+  }
+  wait.for.lock(path, timeout)
   write.table(data.frame(), file=paste0(path,getOption('lock.extension')), col.names=FALSE)
 }
 

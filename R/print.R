@@ -17,6 +17,26 @@ print_m<-function(m) {
     txt<-paste0(txt, '\n```\n', paste0(obj_code, collapse = '\n'), '\n```\n')
   }
 
+  if(length(m$extrasources)>0) {
+    for(es in m$extrasources) {
+      path<-depwalker:::get.objectpath(objectrecord = es, metadata = m)
+      if(file.exists(path)) {
+        src<-readLines(path)
+        if(es$flag.r) {
+          src<-depwalker:::formatted_source(src)
+        } else {
+          if(length(src)>30) {
+            src<-c(src[1:10],'...', src[seq(length(src)-4, length(src))])
+          }
+        }
+        obj_code<-paste0('```\n', paste0(src, collapse='\n'), '\n```\n')
+      } else {
+        obj_code<-paste0("File ", path, " doesn't exist!\n")
+      }
+      txt<-paste0(txt, es$path, ':\n', obj_code, '\n\n')
+    }
+  }
+
   if(m$execution.directory!='') {
     txt<-paste0(txt, 'execution directory: ', m$execution.directory)
   }
@@ -28,7 +48,7 @@ formatted_source<-function(code, flag.include.comments=FALSE, width.cutoff=getOp
   txt<-formatR::tidy_source(text=code, output = FALSE, comment = flag.include.comments, blank = FALSE, arrow = TRUE, width.cutoff = width.cutoff)
   txt<-unlist(stringr::str_split(txt$text.tidy, pattern = stringr::fixed("\n")))
   if(length(txt)>30) {
-    return(c(txt[1:10],'...'))
+    return(c(txt[1:10],'...', txt[seq(length(txt)-4, length(txt))]))
   } else {
     return(txt)
   }

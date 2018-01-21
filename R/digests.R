@@ -2,16 +2,19 @@
 #'
 #' Digests are used in many places for easy identification of equivalent tasks' metadatas.
 #'
+#' Digest consists of all things, that are essential to define what the task is calculating.
+#'
 #' The digest is calculated on the task's essential properties:
 #' \itemize{
 #'  \item \strong{parent records}.
 #'    \describe{
-#'      \item{\code{path}}{path to the ancestor's task metadata}
+#'      \item{\code{digest}}{hash of the parent task, that include his objectrecords}
 #'      \item{\code{name}}{name of the R object calculated by the ancestor}
 #'      \item{\code{aliasname}}{optional. Specifies alternate name of the object for our R script}
 #'    }
 #'  \item \strong{code}.
-#'    All source code used by our task
+#'    hash of contents of each source file with its filename (excluding directory)
+#'  \item \strong{input objects} {}
 #'  \item \strong{output object records}
 #'    \describe{
 #'      \item{\code{name}}{name of the output object}
@@ -30,20 +33,23 @@
 #' Everything else is ignored.
 #' @return string representing MD5 digest of the object in lowercase.
 #' @export
-metadata.digest<-function(metadata)
+metadata.digest<-function(metadata, flag_include_objectrecords)
 {
   assertMetadata(metadata)
-  #Do policzenia digestu potrzeba 2 komponentów:
-  # 1) digestu z parents
-  # 2) digestu z kodu
-  # 3) digestu z objects
 
-  parents.digest<-parents.digest(metadata)
-  code.digest<-calculate_code_digest(metadata)
-  objects.digest<-objects.digest(metadata)
-  runtime.digest<-runtime.digest(metadata)
+  ans<-depwalker:::calculate_task_state_digest(metadata, flag_full_hash = FALSE, flag_include_objectrecords=TRUE)
 
-  ans<-digest::digest(paste0(parents.digest,"><",code.digest, "><", objects.digest),serialize = FALSE)
+  # #Do policzenia digestu potrzeba 2 komponentów:
+  # # 1) digestu z parents
+  # # 2) digestu z kodu
+  # # 3) digestu z objects
+  #
+  # parents.digest<-parents.digest(metadata)
+  # code.digest<-calculate_code_digest(metadata)
+  # objects.digest<-objects.digest(metadata)
+  # runtime.digest<-runtime.digest(metadata)
+  #
+  # ans<-digest::digest(paste0(parents.digest,"><",code.digest, "><", objects.digest),serialize = FALSE)
   assertDigest(ans)
 
   return(ans)
@@ -136,15 +142,16 @@ calculate_one_digest<-function(code)
   return(codedigest)
 }
 
-source_file_digest<-function(path)
+source_file_digest<-function(pat)
 {
   code<-readLines(path)
+
   return(calculate_one_digest(code))
 }
 
 
-#' Returns object's digest for testing equivalence of metadataas
-#' Digest is solely based on names of the objects:
+#' Returns object's digest for testing equivalence of metadatas
+#' Digest is solely based on names of the objects
 #' @param metadata Task's metadata
 objects.digest<-function(metadata)
 {
@@ -242,9 +249,9 @@ parents.digest<-function(metadata)
 #Funkcja kalkuluje object.digest obiektu. Nie wkłada go do parentrecord.
 #Dla obiektów typu data.frame używany jest szczególnie wydajny pamięciowo
 #algorytm, który liczy digest zmienna-po-zmiennej
-calculate.object.digest<-function(object, target.environment=NULL)
+calculate.object.digest<-function(objectname, target.environment=NULL)
 {
-  if (!is.character(object))
+  if (!is.character(objectname))
     stop('Needs string parameter')
 
   if(is.null(target.environment)) {
@@ -252,21 +259,21 @@ calculate.object.digest<-function(object, target.environment=NULL)
   }
 
   #Należy usunąć nasze metadane do kalkulacji digestu, bo metadane same mogą zawierać digest i nigdy nie uzyskamy spójnych wyników
-  parentrecord<-attr(get(object, envir=target.environment),'parentrecord')
+  parentrecord<-attr(get(objectname, envir=target.environment),'parentrecord')
   if (!is.null(parentrecord))
-    eval(parse(text=paste0('setattr(', object, ", 'parentrecord', NULL)")),envir=target.environment)
+    eval(parse(text=paste0('setattr(', objectname, ", 'parentrecord', NULL)")),envir=target.environment)
 
-  if (data.table::is.data.table(get(object, envir=target.environment)))
+  if (data.table::is.data.table(get(objectname, envir=target.environment)))
   {
-    d<-tryCatch(parallel::mclapply(get(object,envir = target.environment) , function(x) digest::digest(x, algo="md5")),
+    d<-tryCatch(parallel::mclapply(get(objectname,envir = target.environment) , function(x) digest::digest(x, algo="md5")),
       error=function(e) e)
     if ('error' %in% class(d))
     {
-      d<-lapply(get(object,envir = target.environment) , function(x) digest::digest(x, algo="md5"))
+      d<-lapply(get(objectname,envir = target.environment) , function(x) digest::digest(x, algo="md5"))
     }
     d<-digest::digest(d[order(names(d))])
   } else {
-    d<-digest::digest(get(object, envir=target.environment))
+    d<-digest::digest(get(objectname, envir=target.environment))
   }
   assertDigest(d)
   return(d)

@@ -5,7 +5,7 @@ source('testfunctions.R')
 
 test_that("Run simple task (1)", expect_equal({
   testf1(tmpdir);
-  system(paste0('nemo ', tmpdir))
+  #system(paste0('nemo ', tmpdir))
   m<-depwalker:::load.metadata(file.path(tmpdir, "task1"));
   if (exists('x',envir=.GlobalEnv))
     rm('x',envir=.GlobalEnv)
@@ -60,3 +60,4 @@ test_that("Test for correct custom script directory (15)", {
   expect_equal(dir, getwd())
   expect_true(file.exists(fileloc))
 })
+

@@ -201,14 +201,14 @@ load.objects.by.metadata<-function(
   else
     flag.force.recalculation<-metadata$flag.force.recalculation
 
-  if (!flag.force.recalculation )
-  {
-    code_changed<-code_has_been_changed(metadata)
-    if (!is.null(code_changed)){
-      flag.force.recalculation <- TRUE
-      metadata<-code_changed
-    }
-  }
+  # if (!flag.force.recalculation )
+  # {
+  #   code_changed<-code_has_been_changed(metadata)
+  #   if (!is.null(code_changed)){
+  #     flag.force.recalculation <- TRUE
+  #     metadata<-code_changed
+  #   }
+  # }
   checkmate::assertPathForOutput(metadata.path, overwrite=TRUE)
   assertMetadata(metadata)
   for(n in objectnames)
@@ -259,122 +259,121 @@ load.objects.by.metadata<-function(
     create.lock.file(paste0(metadata.path,'.meta'))
     ans<-FALSE
   }
-
-  staleness<-is.cached.value.stale(metadata)
-  if(is.na(staleness)) {
-    staleness<-TRUE
-  }
-  if(staleness==FALSE && !flag.force.recalculation) {
-    memobjects<-rep(FALSE,times=length(objrecs))
-    for(i in 1:length(objrecs))
-    {
-      objrec<-objrecs[[i]]
-      aliasname<-aliasnames[i]
-      #objectnames<-objectnames[i]
-      tryCatch(
-        memobjects[i]<-take.object.from.memory(
-                          objectrecord = objrec,
-                          aliasname = aliasname,
-                          target.environment=target.environment,
-                          flag.check.object.digest = flag.check.object.digest,
-                          flag.dry.run = flag.estimate.only),
-        error = function(e) release.lock.file(paste0(metadata.path,'.meta'))
-      )
+  tryCatch({
+    staleness<-is.cached.value.stale(metadata)
+    if(is.na(staleness)) {
+      staleness<-TRUE
     }
-
-    if (flag.estimate.only)
-      ans$load.modes[memobjects]<-1
-
-
-    # Objects already processed (already loaded into memory) are not needed to process anymore:
-    #  objrecs<-objrecs[!memobjects]
-    #  aliasnames<-aliasnames[!memobjects]
-    #  objectnames<-objectnames[!memobjects]
-
-    if (sum(memobjects)==length(objrecs))
-    {
-      if (flag.estimate.only)
-        return(ans)
-      else
+    if(staleness==FALSE && !flag.force.recalculation) {
+      memobjects<-rep(FALSE,times=length(objrecs))
+      for(i in 1:length(objrecs))
       {
-        release.lock.file(paste0(metadata.path,'.meta'))
-        return(metadata)
-      }
-    }
-
-    diskobjects<-rep(NA, times=length(objrecs))
-    for(i in 1:length(objrecs))
-    {
-      if (memobjects[i])
-        diskobjects[i]<-FALSE #Already processed
-      objrec<-objrecs[[i]]
-      aliasname<-aliasnames[i]
-      if (!is.null(objrec$filesize))
-      {
-        #  For large objects quick to create and slow to load/save we are better off running the script
-        load.time<-as.numeric(objrec$filesize) * getOption('object.load.speed')
-        if (!is.null(metadata$timecosts))
-        {
-          if (nrow(metadata$timecosts)==0)
-          {
-            timecosts=sapply(metadata$timecosts, function(tc) tc$systemtime)
-            if (load.time > median(timecosts) *1.3  ) #Czas wczytywania ma być przynajmniej 2xszybszy niż czas tworzenia
-            {
-              diskobjects[i]<-FALSE
-            }
-          }
-        }
-      }
-      if (is.na(diskobjects[i]))
-      {
+        objrec<-objrecs[[i]]
+        aliasname<-aliasnames[i]
+        #objectnames<-objectnames[i]
         tryCatch(
-          diskobjects[i]<-load.object.from.disk(metadata=metadata,
-                                                objectrecord = objrec,
-                                                aliasname = aliasname,
-                                                flag.dont.load = flag.estimate.only,
-                                                flag.check.md5 = flag.check.md5sum,
-                                                flag.ignore.mtime=flag.ignore.mtime,
-                                                target.environment=target.environment,
-                                                flag.allow.promises=flag.allow.promises)=='OK',
+          memobjects[i]<-take.object.from.memory(
+            objectrecord = objrec,
+            aliasname = aliasname,
+            target.environment=target.environment,
+            flag.check.object.digest = flag.check.object.digest,
+            flag.dry.run = flag.estimate.only),
           error = function(e) release.lock.file(paste0(metadata.path,'.meta'))
         )
       }
-    }
 
-    # Objects already processed (already loaded into memory) are not needed to be processed anymore:
-    if (flag.estimate.only)
-    {
-      ans$load.modes[diskobjects]<-2
-      ans$disk.load.time<-foreach::foreach(i=seq(along.with=objrecs), .combine='+') %do%
+      if (flag.estimate.only)
+        ans$load.modes[memobjects]<-1
+
+
+      # Objects already processed (already loaded into memory) are not needed to process anymore:
+      #  objrecs<-objrecs[!memobjects]
+      #  aliasnames<-aliasnames[!memobjects]
+      #  objectnames<-objectnames[!memobjects]
+
+      if (sum(memobjects)==length(objrecs))
+      {
+        if (flag.estimate.only)
+          return(ans)
+        else
+        {
+          release.lock.file(paste0(metadata.path,'.meta'))
+          return(metadata)
+        }
+      }
+
+      diskobjects<-rep(NA, times=length(objrecs))
+      for(i in 1:length(objrecs))
       {
         if (memobjects[i])
-          return(0)
+          diskobjects[i]<-FALSE #Already processed
         objrec<-objrecs[[i]]
         aliasname<-aliasnames[i]
         if (!is.null(objrec$filesize))
-          return(as.numeric(objrec$filesize) * getOption('object.load.speed'))
-        else
-          return(NA)
+        {
+          #  For large objects quick to create and slow to load/save we are better off running the script
+          load.time<-as.numeric(objrec$filesize) * getOption('object.load.speed')
+          if (!is.null(metadata$timecosts))
+          {
+            if (nrow(metadata$timecosts)==0)
+            {
+              timecosts=sapply(metadata$timecosts, function(tc) tc$systemtime)
+              if (load.time > median(timecosts) *1.3  ) #Czas wczytywania ma być przynajmniej 2xszybszy niż czas tworzenia
+              {
+                diskobjects[i]<-FALSE
+              }
+            }
+          }
+        }
+        if (is.na(diskobjects[i]))
+        {
+          tryCatch(
+            diskobjects[i]<-load.object.from.disk(metadata=metadata,
+                                                  objectrecord = objrec,
+                                                  aliasname = aliasname,
+                                                  flag.dont.load = flag.estimate.only,
+                                                  flag.check.md5 = flag.check.md5sum,
+                                                  flag.ignore.mtime=flag.ignore.mtime,
+                                                  target.environment=target.environment,
+                                                  flag.allow.promises=flag.allow.promises)=='OK',
+            error = function(e) release.lock.file(paste0(metadata.path,'.meta'))
+          )
+        }
       }
-    }
 
-
-    #  objrecs<-objrecs[!diskobjects]
-    #  aliasnames<-aliasnames[!diskobjects]
-    #  objectnames<-objectnames[!diskobjects]
-    if (sum(memobjects)+sum(diskobjects==TRUE)==length(objrecs))
-    {
+      # Objects already processed (already loaded into memory) are not needed to be processed anymore:
       if (flag.estimate.only)
-        return(ans)
-      else
       {
-        release.lock.file(paste0(metadata.path,'.meta'))
-        return(metadata)
+        ans$load.modes[diskobjects]<-2
+        ans$disk.load.time<-foreach::foreach(i=seq(along.with=objrecs), .combine='+') %do%
+        {
+          if (memobjects[i])
+            return(0)
+          objrec<-objrecs[[i]]
+          aliasname<-aliasnames[i]
+          if (!is.null(objrec$filesize))
+            return(as.numeric(objrec$filesize) * getOption('object.load.speed'))
+          else
+            return(NA)
+        }
+      }
+
+
+      #  objrecs<-objrecs[!diskobjects]
+      #  aliasnames<-aliasnames[!diskobjects]
+      #  objectnames<-objectnames[!diskobjects]
+      if (sum(memobjects)+sum(diskobjects==TRUE)==length(objrecs))
+      {
+        if (flag.estimate.only)
+          return(ans)
+        else
+        {
+          release.lock.file(paste0(metadata.path,'.meta'))
+          return(metadata)
+        }
       }
     }
-  }
-  run.environment<-new.env(parent=target.environment)
-  tryCatch(
+    run.environment<-new.env(parent=target.environment)
     create.ans<-create.objects(metadata=metadata,
                                metadata.path=metadata.path,
                                objects.to.keep=objectnames,
@@ -384,18 +383,22 @@ load.objects.by.metadata<-function(
                                flag.save.intermediate.objects=flag.save.intermediate.objects,
                                flag.check.md5sum=flag.check.md5sum,
                                flag.save.in.background=flag.save.in.background,
-                               estimation.only=ans),
-    finally=release.lock.file(paste0(metadata.path,'.meta')))
-  if (is.null(create.ans))
-  {
-    return(NULL)
-  }
-  if (flag.force.recalculation)
-  {
-    create.ans$flag.force.recalculation<-FALSE
-    save.metadata(metadata = create.ans)
-  }
-  return(create.ans)
+                               estimation.only=ans)
+    if (is.null(create.ans))
+    {
+      return(NULL)
+    }
+    if (flag.force.recalculation)
+    {
+      create.ans$flag.force.recalculation<-FALSE
+      save.metadata(metadata = create.ans)
+    }
+    return(create.ans)
+
+  },
+  finally=release.lock.file(paste0(metadata.path,'.meta'))
+  )
+
 }
 
 get.objects.by.metadata<-function(

@@ -161,7 +161,7 @@ testf14<-function(tmpdir)
   m<-depwalker:::create.metadata(code, file.path(tmpdir,"task14"))
   m<-depwalker:::add.objectrecord(m,"x",file.path(tmpdir, "x"));
   m<-depwalker::add_source_file(m, 'aux.R', 'x<-42')
-  m<-depwalker::add_source_file(m, 'aux.txt', 'Whatever')
+  m<-depwalker::add_source_file(m, 'aux.txt', 'Whatever', flag.r = FALSE)
 
   depwalker:::make.sure.metadata.is.saved(m);m
 }

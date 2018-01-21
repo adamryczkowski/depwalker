@@ -159,7 +159,10 @@ NULL
     metadata.save.extension	=	".meta.yaml",
     lock.extension	=	'.lock',
     echo.extension	=	".log",
+    runtime_objects_index.extension = '.rdx',
     error.extension	=	'.err.log',
+    reserved_attr_for_hash ='..hash',
+    default.lock.time = 3600, #1 hour
     tune.threshold_objsize_for_dedicated_archive = 5000 #Results from `studium_save`. It will be 4×this size for 'xz'.
   )
   toset	<-	!(names(op.depwalker)	%in%	names(op))

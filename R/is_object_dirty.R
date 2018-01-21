@@ -160,29 +160,38 @@ why.cached.value.is.stale<-function(m) {
 
   #Main code
   cd<-list()
-  if(actual_hashes$code[['/']]$digest!=calculate_one_digest(m$code)) {
-    verdict<-TRUE
-  } else {
-    verdict<-FALSE
-  }
-  cd[['/']]<-list(verdict=verdict)
+  verdict<-FALSE
+  # if(actual_hashes$code[['/']]$digest!=calculate_one_digest(m$code)) {
+  #   verdict<-TRUE
+  # } else {
+  #   verdict<-FALSE
+  # }
+  # cd[['/']]<-list(verdict=verdict)
 
   if(length(m$extrasources)>0) {
     for(i in seq_along(actual_hashes$code)) {
       codename<-names(actual_hashes$code)[[i]]
       c_disk<-actual_hashes$code[[codename]]
-      c_mem<-m$extrasources[[codename]]
+      if(codename==m$codepath) {
+        c_mem<-list(path=m$codepath,
+                    flag.checksum=TRUE,
+                    flag.binary=FALSE,
+                    flag.r=TRUE,
+                    digest=m$codeCRC)
+      } else {
+        c_mem<-m$extrasources[[codename]]
+      }
       if('digest' %in% names(c_mem)){
         if(c_mem$digest != c_disk$hash) {
-          cd[[objname]]<-list(verdict=TRUE)
+          cd[[codename]]<-list(verdict=TRUE)
           if(!is.na(verdict)){
             verdict<-TRUE
           }
         } else {
-          cd[[objname]]<-list(verdict=FALSE)
+          cd[[codename]]<-list(verdict=FALSE)
         }
       } else{
-        cd[[objname]]<-list(verdict=NA)
+        cd[[codename]]<-list(verdict=NA)
         verdict<-NA
       }
     }
@@ -201,10 +210,11 @@ why.cached.value.is.stale<-function(m) {
 #'
 is.cached.value.stale<-function(m) {
   ans<-why.cached.value.is.stale(m)
-  nested_items<-c('parents_mismatch', 'runtime_objects_mismatch', 'source_files_mismatch')
-  nonnested_items<-setdiff(names(ans), nested_items)
-  out<-FALSE
-  for(nni in nonnested_items) {
+
+  # nested_items<-c('parents_mismatch', 'runtime_objects_mismatch', 'source_files_mismatch')
+  # nonnested_items<-setdiff(names(ans), nested_items)
+  # out<-FALSE
+  for(nni in names(ans)) {
     value<-ans[[nni]]$verdict
     if(is.na(value)){
       return(NA)
@@ -213,38 +223,42 @@ is.cached.value.stale<-function(m) {
       out<-TRUE
     }
   }
-  for(ni in nested_items) {
-    dic<-ans[[ni]]
-    for(i in names(dic)) {
-      value<-dic[[i]]
-      if(is.na(value)){
-        return(NA)
-      }
-      if(value==TRUE){
-        out<-TRUE
-      }
-    }
-  }
+  # for(ni in nested_items) {
+  #   dic<-ans[[ni]]
+  #   for(i in names(dic)) {
+  #     value<-dic[[i]]
+  #     if(is.na(value)){
+  #       return(NA)
+  #     }
+  #     if(value==TRUE){
+  #       out<-TRUE
+  #     }
+  #   }
+  # }
   return(out)
 }
 
 
 #Calculates the actual task state hash, that can be used to infer if its definition has changed and there is a need to recalculate all descendants
-calculate_task_state_digest<-function(m, flag_full_hash=FALSE) {
+calculate_task_state_digest<-function(m, flag_full_hash=FALSE, flag_include_objectrecords=FALSE) {
   #The function gets the following pieces of the puzzle:
   # If the task_state_digest executed on each parent gives the same digest as recorded in the metadata
   out_parents<-list()
-  parents<-m$parents[order(names(m$parents))]
-  for(p in parents) {
-    path<-get.parentpath(p, m, flag_include_extension=FALSE)
-    ans<-tryCatch(
-      load.metadata(path),
-      error=function(e){e}
-    )
-    if('error' %in% ans) {
-      out_parents[[p$name]]<-ans
-    } else {
-      out_parents[[p$name]]<-calculate_task_state_digest(ans, flag_full_hash = FALSE)
+  if(length(m$parents)>0) {
+    parents<-m$parents[order(names(m$parents))]
+    for(p in parents) {
+      path<-get.parentpath(p, m, flag_include_extension=FALSE)
+      ans<-tryCatch(
+        load.metadata(path),
+        error=function(e){e}
+      )
+      if('error' %in% ans) {
+        out_parents[[p$name]]<-ans
+      } else {
+        parenthash<-calculate_task_state_digest(ans, flag_full_hash = FALSE, flag_include_objectrecords=TRUE)
+        ans<-paste0(parenthash, ': ', paste0(p$name, '->', p$aliasname, collapse=','))
+        out_parents[[p$name]]<-digest::digest(ans, serialize = FALSE)
+      }
     }
   }
 
@@ -264,59 +278,68 @@ calculate_task_state_digest<-function(m, flag_full_hash=FALSE) {
   #     name='dt', ignored=TRUE)
   # )
 
-  inputobjects_df<-depwalker:::lists_to_df(m$inputobjects, list_columns=c('name', 'objectdigest', 'size'))
-  inputobjects_df<-purrrlyr::by_row(inputobjects_df, ~length(.$name[[1]]), .collate = 'cols', .to='count')
-  inputobjects_df<-dplyr::arrange(tidyr::unnest(inputobjects_df), name)
+  if(length(m$inputobjects)>0) {
+    inputobjects_df<-depwalker:::lists_to_df(m$inputobjects, list_columns=c('name', 'objectdigest', 'size'))
+    inputobjects_df<-purrrlyr::by_row(inputobjects_df, ~length(.$name[[1]]), .collate = 'cols', .to='count')
+    inputobjects_df<-dplyr::arrange(tidyr::unnest(inputobjects_df), name)
 
-  obj_container<-new.env()
-  inputobjects_df$hash<-NA_character_
-  filehashes<-list()
+    obj_container<-new.env()
+    inputobjects_df$hash<-NA_character_
+    filehashes<-list()
 
-  if(nrow(inputobjects_df)>0) {
-    for(i in seq(1, nrow(inputobjects_df))) {
-      if(!inputobjects_df$ignored[[i]]) {
-        path<-depwalker:::get.fullpath(m, path=inputobjects_df$path[[i]])
-        if(file.exists(path)) {
-          if(!'path' %in% names(filehashes)){
-            filehashes[[path]]<-tools::md5sum(path)
-          }
-          hash<-filehashes[[path]]
-          if(hash!=inputobjects_df$filedigest[[i]]) {
-            if(inputobjects_df$count[[i]]>1) {
-              if(!inputobjects_df$name[[i]] %in% obj_container) {
-                objs<-readRDS(path)
-                if(!'list' %in% class(objs)) {
-                  stop(paste0("Wrong format of the ", path, ". Expected class list"))
-                }
-                for(i in seq_along(objs)) {
-                  objname<-names(objs)[[i]]
-                  assign(x = objname, value = objs[[objname]], envir = obj_container)
-                }
-                rm('objs')
-              }
-              if(inputobjects_df$name[[i]] %in% obj_container) {
-                inputobjects_df$hash[[i]]<-calculate.object.digest(inputobjects_df$name[[i]], target.environment=obj_container)
-                rm(inputobjects_df$name[[i]], envir = obj_container)
-              } else {
-                stop(paste0("Cannot find object ", inputobjects_df$name[[i]], " in ", inputobjects_df$path[[i]]))
-              }
+    if(nrow(inputobjects_df)>0) {
+      for(i in seq(1, nrow(inputobjects_df))) {
+        if(!inputobjects_df$ignored[[i]]) {
+          path<-depwalker:::get.fullpath(m, path=inputobjects_df$path[[i]])
+          if(file.exists(path)) {
+            if(!'path' %in% names(filehashes)){
+              filehashes[[path]]<-tools::md5sum(path)
             }
-          } else {
-            inputobjects_df$hash[[i]]<-'OK'
+            hash<-filehashes[[path]]
+            if(hash!=inputobjects_df$filedigest[[i]]) {
+              if(inputobjects_df$count[[i]]>1) {
+                if(!inputobjects_df$name[[i]] %in% obj_container) {
+                  objs<-readRDS(path)
+                  if(!'list' %in% class(objs)) {
+                    stop(paste0("Wrong format of the ", path, ". Expected class list"))
+                  }
+                  for(i in seq_along(objs)) {
+                    objname<-names(objs)[[i]]
+                    assign(x = objname, value = objs[[objname]], envir = obj_container)
+                  }
+                  rm('objs')
+                }
+                if(inputobjects_df$name[[i]] %in% obj_container) {
+                  inputobjects_df$hash[[i]]<-calculate.object.digest(inputobjects_df$name[[i]], target.environment=obj_container)
+                  rm(inputobjects_df$name[[i]], envir = obj_container)
+                } else {
+                  stop(paste0("Cannot find object ", inputobjects_df$name[[i]], " in ", inputobjects_df$path[[i]]))
+                }
+              }
+            } else {
+              inputobjects_df$hash[[i]]<-'OK'
+            }
           }
         }
       }
     }
+    rm(obj_container)
+    out_runtime<-as.list(setNames(inputobjects_df$hash, inputobjects_df$name))
+  } else {
+    out_runtime<-list()
   }
 
-  rm(obj_container)
-  out_runtime<-as.list(setNames(inputobjects_df$hash, inputobjects_df$name))
+
 
   # If the code digest of each input file is the same as recorded in the metadata
 
-  code<-readLines(depwalker:::get.fullpath(metadata = m, m$codepath))
-  out_code<-list('/'=list(hash=calculate_one_digest(code)))
-
+  # if('codepath' %in% names(m)) {
+  #   code<-readLines(depwalker:::get.fullpath(metadata = m, m$codepath))
+  #   out_code<-list('/'=list(hash=calculate_one_digest(code)))
+  # } else {
+  #   out_code<-list()
+  # }
+  out_code<-list()
   code_files<-depwalker:::get_coding_files(m, flag_expand_paths = FALSE)
   for(i in seq_along(code_files)) {
     filename<-code_files[[i]]
@@ -324,7 +347,7 @@ calculate_task_state_digest<-function(m, flag_full_hash=FALSE) {
     if(!file.exists(path)) {
       hash<-simpleError(paste0("Cannot find source text file ", path, "."))
     } else {
-      hash<-source_file_digest(path)
+      hash<-paste0(basename(path), ":", source_file_digest(path))
     }
     out_code[[filename]]<-list(hash=hash)
   }
@@ -342,9 +365,25 @@ calculate_task_state_digest<-function(m, flag_full_hash=FALSE) {
   }
 
   out_code<-out_code[order(names(out_code))]
-  ans<-list(parents=out_parents,
-            runtime=out_runtime,
-            code=out_code)
+
+
+  if(flag_include_objectrecords) {
+    objnames<-names(m$objectrecords)
+    idx<-order(objectnames)
+    objnames<-objnames[idx]
+    txt<-paste0(objnames, collapse = ',')
+    d<-digest::digest(txt, serialize=FALSE)
+    checkmate::assertString(d)
+    out_objrec<-d
+    ans<-list(parents=out_parents,
+              runtime=out_runtime,
+              code=out_code,
+              objectrecords=d)
+  } else {
+    ans<-list(parents=out_parents,
+              runtime=out_runtime,
+              code=out_code)
+  }
 
   if(flag_full_hash) {
     return(ans)

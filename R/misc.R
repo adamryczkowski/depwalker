@@ -40,13 +40,19 @@ cpu.usage.list<-function()
 
 # Returns full path to the code
 #' @export
-get.codepath<-function(metadata, path=NULL)
+get.codepath<-function(metadata, path=NULL, flag_relative_to_exec_dir=FALSE)
 {
   if (is.null(path))
   {
     path <- metadata$codepath
+    path <- pathcat::path.cat(getwd(), dirname(metadata$path), path)
+  } else{
+    if(flag_relative_to_exec_dir) {
+      path <- pathcat::path.cat(getwd(), dirname(metadata$path), metadata$execution.directory, path)
+    } else {
+      path <- pathcat::path.cat(getwd(), dirname(metadata$path), path)
+    }
   }
-  path <- pathcat::path.cat(getwd(), dirname(metadata$path), path)
   return(path)
 }
 
@@ -74,7 +80,7 @@ get.objectpath<-function(objectrecord, metadata=NULL, metadata.path=NULL)
 #Gives a full path made from relative path and the metadata path
 get.fullpath<-function(metadata, path)
 {
-  return(pathcat::path.cat(dirname(metadata.path), path))
+  return(pathcat::path.cat(dirname(metadata$path), path))
 }
 
 
@@ -320,9 +326,11 @@ mytraceback<-function (x = NULL, max.lines = getOption("deparse.max.lines"))
 
 normalize_code_string<-function(code)
 {
-  code[code=='']<-'\n' #Otherwise empty rows will be removed from the string
   code<-unlist(strsplit(code,'\n')) #Makes sure each line is in separate element
-  return(code)
+  code<-formatR::tidy_source(text=code, output = FALSE, comment = TRUE, blank = FALSE, arrow = TRUE, width.cutoff = 100)
+#
+#  code[code=='']<-'\n' #Otherwise empty rows will be removed from the string
+  return(code$text.tidy)
 }
 
 lists_to_df<-function(l, list_columns=character(0)) {
