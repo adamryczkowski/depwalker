@@ -302,8 +302,8 @@ mytraceback<-function (x = NULL, max.lines = getOption("deparse.max.lines"))
         xi<-deparse(xi)
       label <- paste0(n - i + 1L, ": ")
       m <- length(xi)
-      srcloc <- if (!is.null(srcref <- attr(xi, "srcref"))) {
-        srcfile <- attr(srcref, "srcfile")
+      srcloc <- if (!is.null(srcref <- attr(xi, "srcref", exact = TRUE))) {
+        srcfile <- attr(srcref, "srcfile", exact=TRUE)
         paste0(" at ", basename(srcfile$filename), "#",
                srcref[1L])
       }
@@ -331,39 +331,5 @@ normalize_code_string<-function(code)
 #
 #  code[code=='']<-'\n' #Otherwise empty rows will be removed from the string
   return(code$text.tidy)
-}
-
-lists_to_df<-function(l, list_columns=character(0)) {
-  cns<-names(l[[1]])
-  nrow<-length(l)
-
-  nas<-list()
-
-  dt<-data.table(..delete=rep(NA, nrow))
-  for(cn in cns) {
-    if(cn %in% list_columns) {
-      val<-list(list())
-      nas[[cn]]<-NA
-    } else {
-      val<-l[[1]][[cn]]
-      val[[1]]<-NA
-      nas[[cn]]<-val
-    }
-    dt[[cn]]<-rep(val, nrow)
-  }
-  for(i in seq(1, nrow)) {
-    for(cn in cns) {
-      val<-l[[i]][[cn]]
-      if(is.null(val)) {
-        val<-nas[[cn]]
-      }
-      if(cn %in% list_columns) {
-        val<-list(list(val))
-      }
-      set(dt, i, cn, val)
-    }
-  }
-  dt[,..delete:=NULL]
-  return(dt)
 }
 

@@ -37,13 +37,13 @@ lock.exists<-function(path, timeout=NULL) {
   if (file.exists(lockfile))
   {
     t<-as.numeric(file.mtime(lockfile))
-      if (t-as.numeric(Sys.time())>timeout)
-      {
-        return(FALSE)
-      } else {
-        return(TRUE)
-      }
+    if (t-as.numeric(Sys.time())>timeout)
+    {
+      return(FALSE)
     } else {
+      return(TRUE)
+    }
+  } else {
     return(FALSE)
   }
 }
@@ -59,6 +59,7 @@ create.lock.file<-function(path, timeout=NULL)
     timeout<-getOption('default.lock.time')
   }
   wait.for.lock(path, timeout)
+  dir.create(dirname(path), showWarnings = FALSE, recursive = TRUE)
   write.table(data.frame(), file=paste0(path,getOption('lock.extension')), col.names=FALSE)
 }
 

@@ -62,8 +62,20 @@ TODO:
 
 Dopisz kod, który pozwala na modyfikację listy runtime.objects - nie tylko dodawanie, ale również usuwanie.
 Oddziel kod obsługujący wyłącznie runtime objects jest zupełnie oddzielny. Oddzielny projekt?
-OK 1. Upewnij się, że w metadatnych są 4 hashe: 1 - hash kodu OK, 2 - hash nazw obiektów runtime (TODO), 3 - hash każdej wartości każdego obiektu (OK)
-OK 2. Niech interfejs będzie miał funkcję "Is cached value clean", która zwróci powody, dlaczego cached value jest złe.
-OK 3. Dodaj parametr "run.environment", który będzie zawierał obiekty implicite wykorzystywane przez nasz obiekt
-OK 4. Niech run.environment może być również listą
-5. Niech kod może być podany również jako funkcja. Wówczas do kodu dodamy również wszystkie funkcje wywoływane przez nią, rekurencyjnie
+OK # Upewnij się, że w metadatnych są 4 hashe: 1 - hash kodu OK, 2 - hash nazw obiektów runtime (TODO), 3 - hash każdej wartości każdego obiektu (OK)
+OK # Niech interfejs będzie miał funkcję "Is cached value clean", która zwróci powody, dlaczego cached value jest złe.
+OK # Dodaj parametr "run.environment", który będzie zawierał obiekty implicite wykorzystywane przez nasz obiekt
+OK #. Niech run.environment może być również listą
+# Niech kod może być podany również jako funkcja. Wówczas do kodu dodamy również wszystkie funkcje wywoływane przez nią, rekurencyjnie
+OK # Dodaj "extrasources" składową do metadata, która zawiera dodatkową listę hashowanych plików, traktowanych na równi z kodem źródłowym z punktu widzenia liczenia zmiany zadania
+X # Zmień zarządzanie wątkami - zamiast parallel, użyj czegoś bardziej zaawansowanego, co pozwala na zarządzanie obliczeniami. Pula równoległych potoków?
+OK # Niech każda funkcja przyjmuje argument "envir" określający environment w którym należy przechowywać obiekty
+# Zamień wszystkie kropki w nazwach funkcji na podkreślniki
+OK # Upewnij się, że działa część Excelowa prawidłowo.
+# Do logu dodaj zajęcie pamięci (jeśl więcej niż jakiś próg; w stylu "+11.2 MB")
+OK # Sprawdź, czy możesz prawidłowo działać na standardowym pakiecie evaluate - nie, nie możesz, ale skontaktowałem się z autorem jeszcze raz.
+Ok # Dokończ unit testy
+# Dodaj readme.
+# Wykorzystaj podejście library(modules) - niech kod może być podany również jako R expression (a nie tylko jako string)
+OK # Dodaj crc kodu źródłowego
+OK # Daj możliwość więcej, niż jednego source file

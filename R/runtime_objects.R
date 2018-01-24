@@ -102,10 +102,10 @@ set_runtime_archive<-function(obj.environment, objectnames=NULL,
   archivepath<-pathcat::path.cat(dirname(tasktpath), archive_filename)
   hashattrname<-getOption('reserved_attr_for_hash')
   get_digest<-function(objectname, env) {
-    if(is.null(attr(env[[objname]],hashattrname))) {
+    if(is.null(attr(env[[objname]],hashattrname, exact = TRUE))) {
       hash<-depwalker:::calculate.object.digest(objectname, target.environment)
     } else {
-      hash<-attr(env[[objname]],hashattrname)
+      hash<-attr(env[[objname]],hashattrname, exact = TRUE)
       setattr(env[[objname]], hashattrname, NULL)
     }
     return(hash)

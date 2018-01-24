@@ -131,7 +131,7 @@ create.objects<-function(
         error=function(e){class(e)<-'try-error';e})  # nocov end
       metadata<-load.metadata(metadata$path)
     }
-    if (!flag.save.in.background || 'try-error' %in% attr(con,'class'))
+    if (!flag.save.in.background || 'try-error' %in% attr(con,'class', exact = TRUE))
     {
       metadata<-save.objects(metadata=metadata,
                    objectnames=NULL,

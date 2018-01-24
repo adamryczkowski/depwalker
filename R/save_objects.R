@@ -249,7 +249,7 @@ save.objects<-function(
     # nocov end
 
   }
-  if (!flag.save.in.background || 'try-error' %in% attr(newobjectrecords,'class'))
+  if (!flag.save.in.background || 'try-error' %in% attr(newobjectrecords,'class', exact = TRUE))
   {
     newobjectrecords<-lapply(objectrecords,
                              function(objectrecord)
