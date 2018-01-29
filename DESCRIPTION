@@ -26,4 +26,6 @@ Depends:
 RoxygenNote: 6.0.1
 Suggests: testthat
 Remotes:
-	 adamryczkowski/pathcat
+	 adamryczkowski/pathcat,
+	 adamryczkowski/objectstorage
+	 
