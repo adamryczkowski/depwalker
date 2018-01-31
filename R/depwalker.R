@@ -61,89 +61,106 @@
 #' points to) the whole task is treated as changed and its cached objects will be treated invalid until next run is
 #' executed.
 #' \describe{
-#' \item{\strong{codepath}}{path to the R file with the main script. This path and all others can be absolute and can be
-#'       relative to the location of this file itself. The contents of the script is part of the task definition.}
-#' \item{\strong{extrasources}}{Optional dictionary with all the external files managed by the main R script.
+#' \item{\strong{path}}{Only in memory. Path with the saved version of this metadata.
+#'                      It is also a folder that all relative paths are based on.
+#'                      For metadata only in memory, it can be relative, otherwise it is absolute.
+#'                      If relative, it is assumed to be relative to the current directory}
+#' \item{\strong{inputfiles}}{Optional dictionary with all the external files managed by the main R script.
 #'       These may be source files
 #'       in other languages like C++, or CSV files with data. Dictionary key is case-sensitive base file name.
 #'       These source files (written in any language) \emph{are expected to be invoked from within the
 #'       main script file (\code{codepath})} and will not be called automatically.
 #'       There are tracked for changes, and if any of the secondary source files changes,
 #'       the whole task will need to be re-run. }
-#' \item{codeCRC}{MD5 hash of all the source files - \code{codepath} and all files in \code{extrasources}, in
-#'      cannonical order.}
+#' \item{\strong{inputobjects}}{Dictionary with all objects that are initialized on task creation, with contents saved
+#'       on disk and loaded and placed in the run environment when the task is about to be executed.}
+#' \item{inputobjects_storage}{Path relative to the path of the metadata, with the objectstorage for
+#'       the inputobjects}
 #' \item{\strong{parents}}{Dictionary with all parent task definitions. Dictionary key is base name of the task. }
 #' \item{\strong{objectrecords}}{Dictionary with registered objects produced by the main R script.
 #'       Dictionary key is the object name. }
-#' \item{\strong{inputobjects}}{Dictionary with all objects that are initialized on task creation, with contents saved
-#'       on disk and loaded and placed in the run environment when the task is about to be executed.}
-#' \item{runtime.environment}{Only runtime. Environment with loaded version of all or some objects defined in \code{inputobjects} member.}
-#' \item{\strong{execution.directory}}{String with the directory when the script should be run. Can be NULL (or absent),
+#' \item{objectrecords_storage}{Path relative to the path of the metadata, with the objectstorage for
+#'       the objectrecords}
+#' \item{runtime_environment}{Only runtime. Environment with loaded version of all or some objects defined in \code{inputobjects} member.}
+#' \item{\strong{execution_directory}}{String with the directory when the script should be run. Can be NULL (or absent),
 #'       or string with the directory. Directory can be absolute, or relative to the task's directory.
 #'       e.g. execution.directory equal '' will mean the task's main directory.}
-#' \item{flag.never.execute.parallel}{Boolean flag. If set, this task will never be executed in parallel to the main
-#'       R task.}
-#' \item{flag.force.recalculation}{Boolean flag. If set, next time the task will be executed regardless whether
+#' \item{flag_never_execute_parallel}{Boolean flag. If set, this task will never be executed in parallel to the main
+#'       R task. Mostly for debugging purposes}
+#' \item{flag_force_recalculation}{Boolean flag. If set, next time the task will be executed regardless whether
 #'       there is update version in the cache. After recalculation this flag will be cleared automatically.}
-#' \item{timecosts}{List with run statistics of this task.}
+#' \item{flag_use_tmp_storage}{Boolean flag. If set, it indicates that the task's path is slow to write, and
+#'       all large uncompressed files will be first saved into the \code{/tmp}, and then saved into the
+#'       destination path.}
+#' \item{history}{List with run statistics and results of this task.}
 #' }
 #'
-#' \strong{Description of the \code{extrasources} item}:
+#' \strong{Description of the \code{inputfiles} item}:
 #' \describe{
 #' \item{\strong{path}}{Path to the file. Can be absoulute or relative to the task metadata file.}
-#' \item{flag.checksum}{Flag. If set, contents of the file will be checksummed and on any change of the contents, the task
+#' \item{code}{Optional and only runtime. May contain the actual contents of the file. Note, that
+#'       before run all inputfiles except for RMain will get saved to disk, because that is the only way
+#'       the main script could reach them.}
+#' \item{flag_checksum}{Flag. If set, contents of the file will be checksummed and on any change of the contents, the task
 #'       will be reexecuted. If cleared, only change of the filename will be considered when checking whether the cached
 #'       task results are valid.}
-#' \item{flag.binary}{Flag. If set, contents of the file will be treated as binary and checksummed as such. Otherwise they will be
-#'       checkusmmed like source files, line-by-line to avoid Linux/Mac/Windows end-of-line character confussion.}
-#' \item{flag.r}{Flag. If set, contents of the file will be treated as R source and formatted in the logs accordingly.}
-#' \item{digest}{Digest of this source file calculated either in binary or text mode}
+#' \item{type}{Tells type of the file. Possible values: \code{R}, \code{RMain}, \code{txt}, \code{binary}.
+#'             Value determines type of digest (binary/text), type of output formatting (txt/R/binary) or
+#'             if it is a main executable scrupt (RMain/other)}
+#' \item{\strong{digest}}{Digest of this source file calculated either in binary or text mode}
 #' }
+#'
+#' \strong{Description of the \code{inputobject} item}:
+#' \describe{
+#' \item{\strong{name}}{Name of the object in the run environment.}
+#' \item{ignored} A flag. If true, then object with this name will never be tracked and all the subsequent
+#'                elements will be ignored. It is designed for handling optional arguments which presents
+#'                only affects the performance, such as pre-loaded database, which in case it is absent
+#'                can easily be loaded from disk.
+#' \item{\strong{digest}} Digest of the object
+#'}
 #'
 #' \strong{Description of the \code{parentrecord} item}:
 #' \describe{
-#' \item{\strong{path}}{Path (either absoulute or relative) to the imported task's metadata file.}
-#' \item{\strong{name}}{Names of the imported objects.}
-#' \item{\strong{aliasname}}{Alternate names of each object, set if our script needs the object produced
+#' \item{path}{Path (either absoulute or relative) to the imported task's metadata file.}
+#' \item{\strong{names}}{Names of the imported objects.}
+#' \item{\strong{aliasnames}}{Alternate names of each object, set if our script needs the object produced
 #'       by the imported task in different name.}
-#' \item{digest}{Digest of the parent, filled when the object is run, to freeze the parent's state and react
+#' \item{\strong(objectdigests}}{Digests of the parent objects, filled in when the parent object is run,
+#'       to freeze the parent's state and react
 #'       when the parent has changed, invalidating our object}
 #' }
 #'
 #' \strong{Description of the \code{objectrecord} item}:
 #' \describe{
 #' \item{\strong{name}}{Name of object produced by the main R script.}
-#' \item{path}{Path to the location, where the cached version of the object should be saved after execution of the scirpt.
+#' \item{archivepath}{Optional path to the archive location, where the cached version of the object should be saved
+#'       after execution of the script.
 #'       For large objects it can point to the alternate storage or outside of the
 #'       version-controlled/synchronized directory}
 #' \item{compress}{Compression method. Currently the only methods supported are:
-#'       \code{xz}, \code{bzip2}, \code{gzip} and \code{false}}
-#' \item{objectdigest}{MD5 digest of this object when in R memory.}
-#' \item{filedigest}{MD5 digest of the compressed file with the saved object.}
-#' \item{size}{Size of the objects in bytes when in R memory. Usefull for memory usage optimization. }
-#' \item{filesize}{Size of the compressed file with the saved object. When size mismatches, there is no need to check for
-#'       MD5 hash.}
-#' \item{mtime}{Modification time of the compressed file with the saved object. When \code{mtime} mismatches, there is
-#'       no need to check for MD5 has.}
+#'       \code{xz}, \code{bzip2}, \code{gzip} and \code{false}. Defaults to \code{xz}}
+#' \item{\strong{digest}} Digest of the object. Important when this task is a parent.
 #'}
 #'
-#' \strong{Description of the \code{inputobject} item}:
+#' \strong{Description of the \code{history} item}:
 #' \describe{
-#' \item{\strong{name}}{Names of objects in the run environment.}
-#' \item{ignored} A flag. If true, then object with this name will never be tracked and all the subsequent
-#'                elements will be ignored
-#' \item{path}{Path to the location with the saved contents of the object. Small objects will be saved together,
-#'             and each large object will have separate file}
-#' \item{compress}{Compression method. Currently the only methods supported are:
-#'       \code{xz}, \code{bzip2}, \code{gzip} and \code{false}}
-#' \item{objectdigest}{MD5 digests of objects when in R memory.}
-#' \item{filedigest}{MD5 digest of the compressed file with the saved object.}
-#' \item{size}{Size of the objects in bytes when in R memory. Usefull for memory usage optimization. }
-#' \item{filesize}{Size of the compressed file with the saved object. When size mismatches, there is no need to check for
-#'       MD5 hash.}
-#' \item{mtime}{Modification time of the compressed file with the saved object. When \code{mtime} mismatches, there is
-#'       no need to check for MD5 has.}
-#'}
+#' \item{timestamp}{Numeric. Serial number of date and time of the run, in GMT}
+#' \item{walltime}{Execution wall time for the script}
+#' \item{cputime}{Execution cpu time of the execution of the script. May be bigger or smaller from the walltime}
+#' \item{systemtime}{Kernel-mode cpu time of the execution of the script. Big values may indicate an OS bottleneck.}
+#' \item{cpumodel}{String indicating model of the CPU the script was running on}
+#' \item{membefore}{Free mem before running the script}
+#' \item{memafter}{Free mem after running the script. Difference with \code{membefore} may indicate memory leaks.}
+#' \item{corecount}{Number of physical cores of the CPU}
+#' \item{virtualcorecount}{Number of independent execution threads of the CPU}
+#' \item{output}{Only in memory. Debug output of the run. It is a character vector. On metadata save it will
+#'       be dumped to the text file.}
+#' \item{flag_success}{Whether or not the run was a success}
+#'
+#'
+#'
+#'
 #'
 #' @docType package
 #' @name depwalker

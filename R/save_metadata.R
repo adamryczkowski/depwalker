@@ -1,5 +1,7 @@
 #' Makes sure, the task's metadata is saved to disk.
 #'
+#' It is quite complicated thing. For one, the data in memory might be different than data on disk
+#'
 #' For \code{make.sure.metadata.is.saved} if the equivalent metadata is already present on disk,
 #' it assumes the saved metadata contains more detailed optional
 #' information and instead of saving the \code{metadata} parameter, it returns to old one instead.
@@ -13,7 +15,9 @@
 #' custom extension given by the option \code{getOption('metadata.save.extension')}.
 #'
 #' @param metadata metadata object that you want to make sure is saved on disk.
-#' @param flag.save.in.background If set, the actual compression will happen in the forked thread. The task
+#' @param path Directory where the metadata and its dependant objects should be save to.
+#'        Defaults to the current directory.
+#' @param flag_save_in_background If set, the actual compression will happen in the forked thread. The task
 #'        will be locked from execution until the save finishes.
 #' @param flag_use_tmp_storage Relevant only if runtime objects are present and user selects 'xz' compression,
 #'        and external \code{pxz} program is present.
@@ -32,18 +36,38 @@
 #'   it returns the saved metadata.
 #' @export
 #' @seealso \code{\link{save.metadata}} - unconditionally saves task's metadata on disk.
-make.sure.metadata.is.saved<-function(metadata, flag.save.in.background=FALSE,
+make.sure.metadata.is.saved<-function(metadata, path=NULL, flag_save_in_background=FALSE,
                                       flag_use_tmp_storage = FALSE,
                                       parallel_cpus=NULL, flag_wait=TRUE, flag_check_hash=TRUE)
 {
   assertMetadata(metadata)
-  metadata.path<-metadata$path
+
+  browser()
+  #TODO: Niech zapis metadata oznaczać będzie następujące rzeczy:
+  #1. Sprawdź, czy mamy statystyki.
+  #      Jeśli nie, to wczytaj metadata z dysku i sprawdź,
+  #      czy zmienił się hash. Jeśli się nie zmienił,
+  #      to wczytaj statystyki z dysku i doczep do naszych.
+  #2. Jeśli u nas jest ścieżka relatywna i podano path, to użyj parents jako prefiksu dla naszej i
+  #   nadpisz ścieżkę do parents (bo mogła się zmienić, jeśli jest relative).
+  #3. Zapisz wszystkie niezapisane inputfiles
+  #4. Zapisz/zaktualizuj obiekty inputobjects
+  #5. Jeśli nasza metadata się zmieniła względem starej, to upewnij się, że objectrecords storage
+  #   jest puste.
+
+  if(is.null(path)) {
+    metadata.path<-get_path(metadata, basename(metadata$path))
+  } else {
+    metadata.path<-pathcat::path.cat
+  }
+
   checkmate::assertPathForOutput(metadata.path, overwrite=TRUE)
-  if(!flag.save.in.background) {
+
+  if(!flag_save_in_background) {
     parallel_cpus<-0
   }
 
-  if (file.exists(paste0(metadata.path,getOption('metadata.save.extension'))))
+  if (file.exists(paste0(metadata.path,getOption('depwalker.metadata_save_extension'))))
     metadata.disk<-load.metadata(metadata.path)
   else
     metadata.disk<-NULL
@@ -105,23 +129,23 @@ save.metadata<-function(metadata)
   for (i in seq(along.with=m$objectrecords))
   {
     o<-m$objectrecords[[i]]
-    if (!is.null(o$filesize))
-      m$objectrecords[[i]]$filesize<-as.character(o$filesize)
-    if (!is.null(o$size))
-      m$objectrecords[[i]]$size<-as.character(o$size)
-    if (!is.null(o$mtime))
-      m$objectrecords[[i]]$mtime<-as.character(o$mtime)
+    # if (!is.null(o$filesize))
+    #   m$objectrecords[[i]]$filesize<-as.character(o$filesize)
+    # if (!is.null(o$size))
+    #   m$objectrecords[[i]]$size<-as.character(o$size)
+    # if (!is.null(o$mtime))
+    #   m$objectrecords[[i]]$mtime<-as.character(o$mtime)
   }
 
   for (i in seq(along.with=m$inputobjects))
   {
     o<-m$inputobjects[[i]]
-    if (!is.null(o$filesize))
-      m$inputobjects[[i]]$filesize<-as.character(o$filesize)
-    if (!is.null(o$size))
-      m$inputobjects[[i]]$size<-as.character(o$size)
-    if (!is.null(o$mtime))
-      m$inputobjects[[i]]$mtime<-as.character(o$mtime)
+    # if (!is.null(o$filesize))
+    #   m$inputobjects[[i]]$filesize<-as.character(o$filesize)
+    # if (!is.null(o$size))
+    #   m$inputobjects[[i]]$size<-as.character(o$size)
+    # if (!is.null(o$mtime))
+    #   m$inputobjects[[i]]$mtime<-as.character(o$mtime)
   }
   m$runtime.environment<-NULL
 
@@ -154,7 +178,7 @@ save.metadata<-function(metadata)
   return(metadata)
 }
 
-save_runtime_objects<-function(m, parallel_cpus=NULL, flag_wait=FALSE, flag_check_hash=TRUE) {
+save_runtime_objects<-function(m, parallel_cpus=parallel::detectCores(), flag_wait=FALSE, flag_check_hash=TRUE) {
   if(!'runtime.environment' %in% names(m))
   {
     return(NULL)#Nothing to do
@@ -170,11 +194,6 @@ save_runtime_objects<-function(m, parallel_cpus=NULL, flag_wait=FALSE, flag_chec
     return(NULL)
   }
 
-  if(is.null(parallel_cpus))
-  {
-    parallel_cpus<-parallel::detectCores()
-  }
-
   if(parallel_cpus==0) {
     flag_wait=TRUE
   }
@@ -182,7 +201,7 @@ save_runtime_objects<-function(m, parallel_cpus=NULL, flag_wait=FALSE, flag_chec
 
   objects<-m$runtime.environment
 
-  objdefs<-dplyr::filter(lists_to_df(m$inputobjects, list_columns = c('name', 'objectdigest', 'size')),filter(!ignored))
+  objdefs<-dplyr::filter(objectstorage::lists_to_df(l = m$inputobjects),filter(!ignored))
 
   if(flag_wait) {
     wait_for<-'save'
@@ -190,51 +209,19 @@ save_runtime_objects<-function(m, parallel_cpus=NULL, flag_wait=FALSE, flag_chec
     wait_for<-'none'
   }
 
-  jobs<-list()
-  for(io in m$inputobjects) {
-    file<-get.fullpath(m, io$path)
-    if(!is.null(io$filesize)) {
-      filesize<-file.size(path)
-      if(filesize!=io$filesize){
-        unlink(path)
-      }
-    }
-    if(!is.null(io$mtime) && !flag_check_hash) {
-      mtime<-file.mtime(path)
-      if(mtime != io$mtime) {
-        unlink(path)
-      }
-    }
-    if(flag_check_hash && !is.null(io$filedigest)) {
-      filedigest<-as.character(tools::md5sum(path))
-      if(filedigest!=io$filedigest) {
-        unlink(path)
-      }
-    }
-    if(!file.exists(path)) {
-      if(length(io$name)>1) {
+  browser()
+  storagepath<-get_inputobjects_storagepath(m)
 
-        #Create a container for all small objects
-        e<-new.env()
-
-        for(objname in io$name) {
-          assign(objname, objects[[objname]], envir=e)
-        }
-        jobs[[1]]<-depwalker:::save.large.object(obj=as.list(e), objname, file=file, compress=io$compress,
-                                                 wait_for = wait_for, flag_use_tmp_storage = flag_use_tmp_storage,
-                                                 parallel_cpus = parallel_cpus,
-                                                 flag_detach = FALSE)
-      } else {
-        jobs[[length(jobs)+1]]<-depwalker:::save.large.object(obj=objects[[io$name]], objname,
-                                                              file=file, compress=io$compress,
-                                                              wait_for = wait_for,
-                                                              flag_use_tmp_storage = flag_use_tmp_storage,
-                                                              parallel_cpus = parallel_cpus,
-                                                              flag_detach = FALSE)
-      }
-    }
+  if(is.null(m$flag.use.tmp.storage)){
+    flag.use.tmp.storage<-FALSE
+  } else {
+    flag.use.tmp.storage<-TRUE
   }
-  return(jobs)
+
+  objectstorage::set_runtime_objects(storagepath = storagepath, obj.environment = m$runtime.environment,
+                                     objectnames = objdefs$name, flag_use_tmp_storage = flag.use.tmp.storage,
+                                     compress = objdefs$compress, wait_for = wait_for,
+                                     parallel_cpus = parallel_cpus)
 }
 
 #' Function called by make.sure.metadata.is.saved to save all the runtime objects stored in m
@@ -255,48 +242,19 @@ save_runtime_objects<-function(m, parallel_cpus=NULL, flag_wait=FALSE, flag_chec
 #' @seealso \code{\link{create.metadata}}, \code{\link{add.parent}}
 #
 save_metadata<-function(m, flag_use_tmp_storage = FALSE,
-                               parallel_cpus=NULL, flag_wait=FALSE, flag_check_hash=TRUE) {
+                               parallel_cpus=parallel::detectCores(), flag_wait=FALSE) {
 
-
-  jobs<-save_runtime_objects(m = m, parallel_cpus=parallel_cpus, flag_wait=flag_wait, flag_check_hash=flag_check_hash)
-
-  fn_wait_and_save<-function(m, jobs, parallel_cpus) {
-    #Funkcja zdejmująca blokadę i zapisująca metadane
-    if(!is.null(jobs)) {
-      parallel::mccollect(jobs, wait=TRUE)
-      ios<-list()
-
-      update_metadata_obj<-function(m, objmeta) {
-        if(!is.null(objmeta$path)) {
-          path<-get.fullpath(m, objmeta$path)
-          objmeta$filesize<-file.size(path)
-          objmeta$mtime<-file.mtime(path)
-          if(flag_check_digest) {
-            objmeta$filedigest<-as.character(tools::md5sum(path))
-          }
-        }
-        return(objmeta)
-      }
-      if(parallel_cpus>0) {
-        ios<-parallel::mclapply(m$inputobjects, FUN=update_metadata_obj, mc.cores = parallel_cpus)
-      } else {
-        ios<-lapply(m$inputobjects, FUN=update_metadata_obj)
-      }
-      ios<-ios[order(names(ios))]
-      m$inputobjects<-ios
-    }
+  if(parallel_cpus==0 || flag_wait) {
+    save_runtime_objects(m = m, parallel_cpus=parallel_cpus, flag_wait=TRUE)
     depwalker:::save.metadata(m)
     return(m)
-  }
-  if(flag_wait) {
-    if(is.null(jobs)) {
-      m<-fn_wait_and_save(m, NULL, parallel_cpus)
-    } else {
-      m<-fn_wait_and_save(m, list(), parallel_cpus)
-    }
-    return(m)
   } else {
-    job<-parallel::mcparallel(fn_wait_and_save(m, jobs, parallel_cpus))
+    job<-parallel::mcparallel({
+      save_runtime_objects(m = m, parallel_cpus=parallel_cpus, flag_wait=flag_wait)
+      depwalker:::save.metadata(m)
+    }, silent = TRUE)
     return(job)
   }
+
+
 }

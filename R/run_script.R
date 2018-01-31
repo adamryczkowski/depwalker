@@ -40,7 +40,7 @@ capture.evaluate<-function(code, envir=.GlobalEnv)
   return(list(output=out, is.error=is_error))
 }
 
-run.script<-function(metadata, objects.to.keep,estimation.only=NULL, run.environment=NULL)
+run.script<-function(metadata, objects.to.keep,estimation.only=NULL, run.environment=NULL, flag_do_gc=TRUE)
 {
   if (!is.logical(estimation.only))
   {
@@ -48,53 +48,51 @@ run.script<-function(metadata, objects.to.keep,estimation.only=NULL, run.environ
     return(estimation.only)
   }
 
-
-  outfile=pathcat::path.cat(getwd(), paste0(metadata$path,getOption('echo.extension')))
-  if (file.exists(outfile))
-    unlink(outfile)
-  errfile=pathcat::path.cat(getwd(), paste0(metadata$path,getOption('error.extension')))
-  if (file.exists(errfile))
-    unlink(errfile)
+  # outfile=pathcat::path.cat(getwd(), paste0(metadata$path,getOption('depwalker.echo_extension')))
+  # if (file.exists(outfile))
+  #   unlink(outfile)
+  # errfile=pathcat::path.cat(getwd(), paste0(metadata$path,getOption('depwalker.error_extension')))
+  # if (file.exists(errfile))
+  #   unlink(errfile)
 
   vars.before<-c(ls(envir=run.environment, all.names = TRUE), objects.to.keep)
-  gc()
-  busycpus<-cpu.usage.list()$busy.cpus
+  if(flag_do_gc) {
+    gc()
+  }
+  #busycpus<-cpu.usage.list()$busy.cpus #It takes too long to compute
   fmem<-memfree()
   olddir<-getwd()
-  if (!is.null(metadata$execution.directory))
+  if (!is.null(metadata$execution_directory))
   {
-    setwd(get.codepath(metadata, metadata$execution.directory))
+    setwd(get_path(metadata, metadata$execution_directory))
   }
+
+  code<-get_main_code(metadata)
+
   time<-as.numeric(system.time(
-    out<-capture.evaluate(metadata$code, envir=run.environment)
+    out<-capture.evaluate(code, envir=run.environment)
   ))[1:3]
   coresinfo<-cpu.count()
-  gc()
-  if (out$is.error)
-  {
-    con<-file(errfile)
-  } else
-  {
-    con<-file(outfile)
+  if(flag_do_gc) {
+    gc()
   }
-  writeLines(out$output, con)
-  close(con)
   if (!is.null(metadata$execution.directory))
   {
     setwd(olddir)
   }
-  timecost<-list(walltime=bit64::as.integer64(time[3]*1000),
-                 cputime=bit64::as.integer64(time[1]*1000),
-                 systemtime=bit64::as.integer64(time[2]*1000),
-                 cpumodel=sfsmisc::Sys.cpuinfo()[[5]],
-                 membefore=as.integer(fmem),
-                 memafter=as.integer(memfree()),
-                 corecount=as.integer(coresinfo$core.count),
-                 virtualcorecount=as.integer(coresinfo$virtual.core.count), busycpus=as.integer(busycpus))
-  if (is.null(metadata$timecosts))
-    metadata$timecosts<-data.table::as.data.table(timecost)
-  else
-    metadata$timecosts<-rbind(metadata$timecosts, timecost)
+  metadata<-append_history_record(metadata,
+                                  timestamp=timestamp,
+                                  walltime=time[3]*1000,
+                                  cputime=time[1]*1000,
+                                  systemtime=time[2]*1000,
+                                  cpumodel=sfsmisc::Sys.cpuinfo()[[5]],
+                                  membefore=as.integer(fmem),
+                                  memafter=as.integer(memfree()),
+                                  corecount=as.integer(coresinfo$core.count),
+                                  virtualcorecount=as.integer(coresinfo$virtual.core.count),
+                                  output=out$output,
+                                  flag_success=!out$is.error)
+
   vars.after<-ls(envir=run.environment, all.names = TRUE)
   vars.to.delete<-setdiff(setdiff(vars.after, vars.before), objects.to.keep)
   if (length(vars.to.delete)>0)

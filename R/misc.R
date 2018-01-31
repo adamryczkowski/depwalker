@@ -6,7 +6,7 @@ cpuinfo<-function()
 }
 
 # Returns number of CPUs
-cpu.count<-function()
+cpu_count<-function()
 {
   a<-system('lscpu -p', intern=TRUE)
   a<-a[4:length(a)]
@@ -17,7 +17,7 @@ cpu.count<-function()
 }
 
 # Returns table with usage statistics of all processors
-cpu.usage<-function()
+cpu_usage<-function()
 {
   ans<-system('mpstat -P ON 1 1', intern=TRUE)
   a<-ans[3:length(ans)]
@@ -30,31 +30,25 @@ cpu.usage<-function()
 }
 
 # Returns list of processors, which usage is over 75%
-cpu.usage.list<-function()
+cpu_usage_list<-function()
 {
-  data<-cpu.usage()
+  data<-cpu_usage()
   n<-'%usr'
   busy.cpus<-sum(data[,n,with=FALSE]>75)
   return(list(busy.cpus=busy.cpus))
 }
 
-# Returns full path to the code
-#' @export
-get.codepath<-function(metadata, path=NULL, flag_relative_to_exec_dir=FALSE)
-{
-  if (is.null(path))
-  {
-    path <- metadata$codepath
-    path <- pathcat::path.cat(getwd(), dirname(metadata$path), path)
-  } else{
-    if(flag_relative_to_exec_dir) {
-      path <- pathcat::path.cat(getwd(), dirname(metadata$path), metadata$execution.directory, path)
-    } else {
-      path <- pathcat::path.cat(getwd(), dirname(metadata$path), path)
-    }
-  }
-  return(path)
-}
+
+
+
+
+
+
+
+
+
+
+
 
 get.parentpath<-function(parentrecord, metadata=NULL, metadata.path=NULL, flag_include_extension=TRUE)
 {
@@ -93,6 +87,16 @@ get.objectrecords<-function(metadata, objnames)
   objectnames<-sapply(metadata$objectrecords, function(x)x$name)
   idx<-which(objectnames %in% objnames )
   return(metadata$objectrecords[idx])
+}
+
+get_objectrecords_storagepath(metadata) {
+  path<-metadata$objectrecords_storagepath
+  pathcat::path.cat(getwd(), dirname(metadata$path), path)
+}
+
+get_inputobjects_storagepath(metadata) {
+  path<-metadata$inputobjects_storagepath
+  pathcat::path.cat(getwd(), dirname(metadata$path), path)
 }
 
 #' Tests whether two task metadata's define the same task equal (not necessarily identical)
@@ -333,3 +337,8 @@ normalize_code_string<-function(code)
   return(code$text.tidy)
 }
 
+normalize_text_string<-function(code)
+{
+  code<-unlist(strsplit(code,'\n')) #Makes sure each line is in separate element
+  return(code)
+}

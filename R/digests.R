@@ -129,6 +129,11 @@ get_binary_files<-function(metadata, flag_expand_paths)
 #' I don't use tools::md5sum to make sure, that the digest is independent on newlines format (Windows/Linux)
 calculate_one_digest<-function(code)
 {
+  if(is.raw(code)) {
+    codedigest<-digest::digest(code, serialize=FALSE)
+  } else {
+
+  }
   if (length(code)>1)
     codedigest<-digest::digest(
       do.call(
@@ -142,7 +147,7 @@ calculate_one_digest<-function(code)
   return(codedigest)
 }
 
-source_file_digest<-function(pat)
+source_file_digest<-function(path)
 {
   code<-readLines(path)
 
