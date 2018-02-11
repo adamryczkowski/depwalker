@@ -4,6 +4,13 @@ source('testfunctions.R')
 #source('tests/testthat/testfunctions.R')
 
 test_that("Run simple task (1)", expect_equal({
+  m<-create_metadata('simple_task')
+  m<-add_source_file(metadata = m, code = 'x<-a+10')
+  m<-add_inputobject(m, objectname = 'a', object = 12)
+  m<-add_objectrecord(m, name='x')
+
+  make_sure_metadata_is_saved(m, path = '/tmp')
+
   testf1(tmpdir);
   #system(paste0('nemo ', tmpdir))
   m<-depwalker:::load.metadata(file.path(tmpdir, "task1"));

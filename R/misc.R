@@ -38,14 +38,83 @@ cpu_usage_list<-function()
   return(list(busy.cpus=busy.cpus))
 }
 
+platform_newLine <- function() {
 
+  is.windows <- grepl(tolower(.Platform$OS.type), "windows", fixed = TRUE)
 
+  if (is.windows) {
+    newline <- "\r\n"
+  } else {
+    newline <- "\n"
+  }
 
+  sys.name <- Sys.info()["sysname"]
+  is.windows.2nd.opinion <- grepl(tolower(sys.name), "windows", fixed = TRUE)
 
+  if (is.windows != is.windows.2nd.opinion)
+    warning("R seems to run on Windows OS but this could not be recognized for sure")
 
+  return(newline)
+}
 
+#Porównuje plik zapisany w path z jego potencjalną zawartością contents
+check_if_different_file<-function(path, contents) {
+  tmpfile<-tempfile()
+  writeLines(text = contents, con = tmpfile)
+  hash_contents<-tools::md5sum(tmpfile)
+  if(file.exists(path)) {
+    hash_file<-tools::md5sum(path)
+  } else {
+    hash_file<-''
+  }
 
+  return(hash_file==hash_contents)
+}
 
+#' Appends myenv to the chain of env that starts with the target_env.
+#'
+#' @param myenv Environment with the objects you want to be available in the \code{target_env}.
+#'        Remember that this environment will get embedded into the envirionment structure of the
+#'        task be reference, so never touch change the parents of it (and better yet: never use it again)
+#' @param target_env The environment chain you wish to modify. Remember to specify the youngest
+#'        child you have of the chain, as it is impossible in R to iterate environments in the
+#'        direction of their children.
+#' @param flag_last If \code{flag_last==TRUE}, the myenv it will put it on the end
+#'        of the target_env stack, and objects in the myenv might get masked.
+#'        Otherwise it is put as an immidiate father.
+#' @return the function will modify the \code{target_env} as a side effect.
+#'         It will return \code{target_env}, but remember that all work on environments
+#'         is always done by reference.
+#'
+#' @export
+append_env_to_env<-function(myenv, target_env, flag_last=FALSE) {
+  if(identical(target_env, globalenv()) || identical(target_env, baseenv())) {
+    stop("Doesn't make sense if the target_env is either globalenv or baseenv")
+  }
+
+  if(flag_last==FALSE) {
+    tmpenv<-parent.env(target_env)
+    parent.env(target_env)<-myenv
+    parent.env(myenv)<-tmpenv
+    return(TRUE)
+  } else {
+    # Iterate until globalenv or baseenv is encountered (whatever first). Then
+    # insert myenv just before it in the chain
+    while(TRUE) {
+      nextenv<-parent.env(target_env)
+      if(identical(nextenv, globalenv()) || identical(nextenv, baseenv())) {
+        tmpenv<-parent.env(target_env)
+        parent.env(target_env)<-myenv
+        parent.env(myenv)<-tmpenv
+        return(TRUE)
+      }
+      if(identical(nextenv, emptyenv())) {
+        browser() #No baseenv nor globalenv encountered
+      }
+      target_env<-nextenv
+    }
+  }
+}
 
 
 
@@ -89,12 +158,12 @@ get.objectrecords<-function(metadata, objnames)
   return(metadata$objectrecords[idx])
 }
 
-get_objectrecords_storagepath(metadata) {
+get_objectrecords_storagepath<-function(metadata) {
   path<-metadata$objectrecords_storagepath
   pathcat::path.cat(getwd(), dirname(metadata$path), path)
 }
 
-get_inputobjects_storagepath(metadata) {
+get_inputobjects_storagepath<-function(metadata) {
   path<-metadata$inputobjects_storagepath
   pathcat::path.cat(getwd(), dirname(metadata$path), path)
 }

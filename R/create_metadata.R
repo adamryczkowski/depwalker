@@ -1,35 +1,37 @@
 #' Creates task's metadata object.
 #'
-#' The function will create basic metadata describing the the object recipe.
-#' @param code Character vector with code. Each element of the vector will be treated as separate line.
-#' @param source.path Alternative way of specifying code to run. \code{code} and \code{source.path} are mutually exclusive, and required.
-#' @param metadata.path path to the task's metadata file without extension. The metadata will not be saved with this command, but
-#'    the path information is nevertheless required, as it is a mandatory part of the task's metadata specification.
-#'    If path is relative, it will be assumed to be relative to the current working directory.
-#' @param flag.never.execute.parallel if set, the task will never trigger parallel execution of dependent tasks. Defaults to \code{FALSE}.
-#' @param flag.use.tmp.storage Boolean flag. If set, it indicates that the task's path is slow to write, and
-#'       all large uncompressed files will be first saved into the \code{/tmp}, and then saved into the
-#'       destination path. Defaults to FALSE
-#' @param execution.directory directory relative to the metadata.path, which will be set as the current directory when the
-#'    code is run.
+#' The function will create basic metadata describing the the object recipe. The metadata will be in the state "unsaved",
+#' which will reduce some functionalities: unless the task is saved to disk, it cannot be used as a parent of another task.
+#' @param name Name of the task. Together with the current directory it will become a root folder for the task.
+#' @param inputobjects_storage_path Relative to task's root (or absolute) path that specify place, where inputobjects are saved.
+#' Not needed for purely in-memory tasks.
+#' @param objectrecords_storage_path Relative to task's root (or absolute) path that specify place, where calculated objects are saved.
+#' Not needed for purely in-memory tasks.
+#' @param execution_directory Relative to task's root (or absolute) path, which will be set as the current directory when the
+#'    code is run. Defaults to the task's root folder.
+#' @param flag_never_execute_parallel Flag. This task will never be run in background. Useful for debugging purposes.
+#' @param flag_use_tmp_storage Irrelevant for in-memory tasks. Specifies whether use fast /tmp folder for fast uncompressed save.
+#' @param flag_include_global_env Boolean flag. Normally the task is run in the environment that includes only base packages
+#'       and manually specified libraries. If you want to use the \code{library} or \code{require} functions inside the scripts,
+#'       set this flag to true. As a side effect, all the global objects will also be available for the script.
 #' @return task's metadata object. One might want to complete object's creation with complementary functions
-#'    \code{add.parent} and \code{add.object.record}
+#'    \code{\link{add_source_file}}, \code{\link{add_inputobject}}, \code{\link{add_parent}}, \code{\link{add_objectrecord}}.
 #' @export
-#' @seealso \code{\link{add.parent}}, \code{\link{add.objectrecord}}
+#' @seealso \code{\link{add_source_file}}, \code{\link{add_inputobject}}, \code{\link{add_parent}}, \code{\link{add_objectrecord}},
 create_metadata<-function(name,
                           inputobjects_storage_path=NULL,
                           objectrecords_storage_path=NULL,
-                          runtime_environment=NULL,
                           execution_directory='',
                           flag_never_execute_parallel=FALSE,
-                          flag_use_tmp_storage=NULL)
+                          flag_use_tmp_storage=FALSE,
+                          flag_include_global_env=FALSE)
 {
   checkmate::assert_string(name)
   checkmate::assert_true(name!='')
   metadata<-list(path=name)
   path<-get_path(metadata, name, extension='metadata')
   checkmate::assertPathForOutput(dirname(path), overwrite=TRUE)
-  metadata$path<-pathcat::file_path_sans_all_ext(name)
+#  metadata$path<-pathcat::file_path_sans_all_ext(name)
 
 
   metadata$inputfiles<-list()
@@ -38,9 +40,9 @@ create_metadata<-function(name,
   if(is.null(inputobjects_storage_path)) {
     inputobjects_storage_path<-paste0(basename(metadata$path), '_io')
   }
-  path_to_check<-get_path(metadata, inputobjects_storage_path, input_relative_to='metadata',
-                          extension='objectstorage')
-  checkmate::assertPathForOutput(dirname(path_to_check), overwrite=TRUE)
+  #path_to_check<-get_path(metadata, inputobjects_storage_path, input_relative_to='metadata',
+  #                        extension='objectstorage')
+  #checkmate::assertPathForOutput(dirname(path_to_check), overwrite=TRUE)
   inputobjects_storage_path<-get_path(metadata, inputobjects_storage_path, input_relative_to='metadata',
                                       extension='ignore', return_relative_to='metadata')
   metadata$inputobjects_storage<-inputobjects_storage_path
@@ -52,37 +54,45 @@ create_metadata<-function(name,
   if(is.null(objectrecords_storage_path)) {
     objectrecords_storage_path<-paste0(basename(metadata$path), '_or')
   }
-  path_to_check<-get_path(metadata, inputobjects_storage_path, input_relative_to='metadata',
-                          extension='objectstorage')
-  checkmate::assertPathForOutput(dirname(path_to_check), overwrite=TRUE)
+  #path_to_check<-get_path(metadata, inputobjects_storage_path, input_relative_to='metadata',
+  #                       extension='objectstorage')
+  #checkmate::assertPathForOutput(dirname(path_to_check), overwrite=TRUE)
 
   objectrecords_storage_path<-get_path(metadata, inputobjects_storage_path, input_relative_to='metadata',
                                       extension='ignore', return_relative_to='metadata')
   metadata$objectrecords_storage<-objectrecords_storage_path
 
-  runtime_environment<-new.env()
+  if(flag_include_global_env) {
+    runtime_environment<-new.env(parent = globalenv())
+  } else {
+    runtime_environment<-new.env(parent = baseenv())
+  }
+
   metadata$runtime_environment<-runtime_environment
 
-  path_to_check<-get_path(metadata, execution_directory)
-  checkmate::expect_directory_exists(path_to_check, access='w')
+  #path_to_check<-get_path(metadata, execution_directory)
+  #checkmate::expect_directory_exists(path_to_check, access='w')
   execution_directory<-get_path(metadata, execution_directory, return_relative_to='metadata')
   metadata$execution_directory<-execution_directory
 
   checkmate::assertFlag(flag_never_execute_parallel)
   metadata$flag_never_execute_parallel<-flag_never_execute_parallel
+  metadata$flag_include_global_env<-flag_include_global_env
 
   checkmate::assertFlag(flag_use_tmp_storage)
   metadata$flag_use_tmp_storage<-flag_use_tmp_storage
+  metadata$flag_force_recalculation<-FALSE
 
-  checkmate::assertDataFrame(metadata$timecosts)
-  cols<-c('walltime', 'cputime', 'systemtime','cpumodel', 'membefore',
-          'memafter', 'corecount', 'virtualcorecount', 'busycpus')
-  if (!all(cols %in% colnames(metadata$timecosts)))
-    stop("Insufficient columns in metadata$timecosts data.frame")
+  # checkmate::assertDataFrame(metadata$timecosts)
+  # cols<-c('walltime', 'cputime', 'systemtime','cpumodel', 'membefore',
+  #         'memafter', 'corecount', 'virtualcorecount', 'busycpus')
+  # if (!all(cols %in% colnames(metadata$timecosts)))
+  #   stop("Insufficient columns in metadata$timecosts data.frame")
 
   timecosts<-list()
   metadata$timecosts<-timecosts
-  assertMetadata(metadata)
+  metadata$libraries<-list()
+  assertMetadata(metadata, flag_ready_to_run=FALSE)
   return(metadata)
 }
 #' Add additional source file to the task.
@@ -91,7 +101,7 @@ create_metadata<-function(name,
 #'
 #' @param metadata already created metadata you wish to add the source file to. You can create task's metadata from scratch with \code{\link{create.metadata}}.
 #' @param filepath Path to the file, if the file is already existing (it can be relative to the task's path).
-#'        It can be ommited, if type=='RMain', then it is assumed to be \code{<taskname>.R}, and \cpde{code} must be set.
+#'        It can be ommited, if type=='RMain', then it is assumed to be \code{<taskname>.R}, and \code{code} must be set.
 #' @param code Optional string with the contents of the file. If specified and the file does not already exist, the file will be created
 #'        with this contents.
 #' @param type Type of the source file. Possible values: \code{RMain} (default), \code{R}, \code{txt}, \code{binary}.
@@ -187,7 +197,7 @@ add_source_file<-function(metadata, filepath=NULL, code=NULL, type='RMain',
     path<-get_path(metadata, path, return_relative_to='metadata')
   }
 
-  metadata<-append_extra_code(metadata, filepath=path, code=code, flag_checksum=flag_checksum, type = type, digest = digest)
+  metadata<-append_extra_code(metadata, filepath=path, code=code, flag_checksum=flag_checksum, type = type, digest = hash1)
   return(metadata)
 }
 
@@ -222,17 +232,101 @@ append_extra_code<-function(metadata, filepath, code, flag_checksum, type, diges
 #' @param metadata already created metadata you wish to add existing object.
 #' @param objectnames names of the new objects. If object doesn't exist in the environment, then it will be
 #' removed from the metadata
-#' @param environment Environment that contains all the \code{objectnames} objects.
+#' @param envir Environment or list that contains all the \code{objectnames} objects.
 #'   Thus the names of the object must match both \code{environment} and how the task references them.
-#' @param ignored Boolean (either single value, or vector of the size of \code{objectnames} or named vector with
+#' @param flag_ignored Boolean (either single value, or vector of the size of \code{objectnames} or named vector with
 #'        \code{objectnames} as keys) that specified whether a given object should be saved to disk when
 #'        saving metadata. Think about ignored objects as optionally required, given only for efficiency.
 #'        \emph{Task's code cannot assume the ignored objects will be present in memory.}
 #' @return modified \code{metadata} with the registered objects and their value.
 #' @export
-add_inputobject<-function(metadata, objectnames=NULL, envir, ignored,
+add_inputobjects<-function(metadata, objectnames=NULL, envir, flag_ignored=FALSE,
                           flag_allow_replace=FALSE, flag_allow_remove=TRUE)
 {
+  if('list' %in% class(envir)) {
+    envir<-as.environment(envir)
+  }
+  if(is.null(objectnames)){
+    objectnames<-ls(envir = envir)
+  }
+  assertMetadata(metadata, flag_ready_to_run=FALSE)
+  checkmate::assertCharacter(objectnames)
+  checkmate::assert_environment(envir)
+  checkmate::assert_logical(flag_ignored)
+  checkmate::assert_flag(flag_allow_replace)
+  checkmate::assert_flag(flag_allow_remove)
+
+  if(length(setdiff(objectnames, ls(envir = envir)))>0) {
+    if(!flag_allow_remove) {
+      stop(paste0("Objects ", paste0(setdiff(objectnames, ls(envir = envir)), collapse = ', '),
+                  " are missing from the input envir and flag_allow_remove=FALSE"))
+    }
+    browser()
+    #Object is missing
+    #Removing objects is not yet implemented.
+  }
+
+  #browser()
+  flag_ignored<-objectstorage::parse_argument(arg = flag_ignored, objectnames = objectnames, default_value = FALSE)
+  objectdigests<-rep(NA, length(objectnames))
+  for(i in seq_along(objectnames)) {
+    objectname<-objectnames[[i]]
+    objectdigests[[i]]<-objectstorage::calculate.object.digest(objectname = objectname,
+                                                               target.environment = envir)
+  }
+  objectdigests<-setNames(objectdigests, objectnames)
+
+  allobjects_df<-get_runtime_objects(metadata, TRUE, TRUE)
+
+  if(sum(objectnames %in% allobjects_df$objectname)>0) {
+    #Musimy sprawdzić, czy użytkownik nie wprowadza konfliktu z parents
+    pos_objs<-which(allobjects_df$objectname %in% objectnames)
+    for(dup_pos in pos_objs) {
+      #Iterujemy się po każdym z obiektów
+      dup_obj<-allobjects_df$objectname[dup_pos]
+      if(allobjects_df$parent[dup_pos]){
+        stop(paste0("The object ", dup_obj, " will already be available from parent records"))
+      } else {
+        if(allobjects_df$digest!=objectdigests[[dup_obj]]) {
+          if(!flag_allow_replace) {
+            stop(paste0("Object ", dup_obj, " already exists in this metadata"))
+          }
+        }
+      }
+    }
+  }
+
+  for(objectname in objectnames) {
+    assign(objectname, value = get(objectname, envir = envir), envir = metadata$runtime_environment)
+
+    metadata$inputobjects[[objectname]]<-list(name=objectname,
+                                              ignored=flag_ignored[[objectname]],
+                                              digest=objectdigests[[objectname]])
+  }
+
+  assertMetadata(metadata, flag_ready_to_run=FALSE)
+  return(metadata)
+}
+
+
+#' @export
+add_inputobject<-function(metadata, objectname, object=NULL, flag_ignored=FALSE,
+                           flag_allow_replace=FALSE)
+{
+  envir<-new.env()
+  assign(x = objectname, value=object, envir=envir)
+  m<-add_inputobjects(metadata=metadata, objectnames = objectname, envir=envir,
+                      flag_ignored = flag_ignored, flag_allow_replace = flag_allow_replace)
+  return(metadata)
+}
+
+#' @export
+remove_inputobject<-function(metadata, objectname, object=NULL, flag_ignored=NULL,
+                          flag_allow_replace=FALSE, flag_allow_remove=TRUE)
+{
+  if('list' %in% class(envir)) {
+    envir<-as.environment(envir)
+  }
   if(is.null(objectnames)){
     objectnames<-ls(envir = envir)
   }
@@ -292,7 +386,6 @@ add_inputobject<-function(metadata, objectnames=NULL, envir, ignored,
   return(metadata)
 }
 
-
 #' Adds parent (ancestor) record to the existing metadata.
 #'
 #' You specify parent record when you need another task to be already
@@ -311,7 +404,7 @@ add_inputobject<-function(metadata, objectnames=NULL, envir, ignored,
 #'   flexibility in naming task's output objects.
 #' @return modified \code{metadata} argument that includes specified parent's record.
 #' @export
-#' @seealso \code{\link{create.metadata}}, \code{\link{add.objectrecord}}
+#' @seealso \code{\link{create_metadata}}, \code{\link{add_objectrecord}}
 add_parent<-function(metadata=NULL, name=NULL, parent=NULL, aliasname=NULL, flag_remember_absolute_path=FALSE,
                      flag_overwrite_parent=FALSE)
 {
@@ -402,11 +495,12 @@ add_parent<-function(metadata=NULL, name=NULL, parent=NULL, aliasname=NULL, flag
 #' @param flag_store_relative_path If set it will store the absolute path in the metadata. Important, when you
 #'   want to move the metadata to different folder, and keep the objectrecord in the old place. Default: FALSE
 #'   Makes sense only if \code{archivepath} parameter is used.
+#' @param flag_allow_empty If set, there will be no warning if the script didn't produce this object.
 #' @return modified \code{metadata} argument that includes specified object's record.
 #' @export
-#' @seealso \code{\link{create.metadata}}, \code{\link{add.parent}}
+#' @seealso \code{\link{create_metadata}}, \code{\link{add_parent}}
 #' @export
-add_objectrecord<-function(metadata, name, archivepath=NULL, compress='xz', flag_store_abolute_path=FALSE)
+add_objectrecord<-function(metadata, name, archivepath=NULL, compress='xz', flag_store_abolute_path=FALSE, flag_allow_empty=FALSE)
 {
   assertMetadata(metadata, flag_ready_to_run=FALSE)
   checkmate::assertString(name)
@@ -436,20 +530,66 @@ add_objectrecord<-function(metadata, name, archivepath=NULL, compress='xz', flag
   objectnames<-sapply(objectrecords, function(x)x$name)
   if (name %in% objectnames)
   {
-    #Już jest ta nazwa w parentrrecords... Najpierw usuwamy poprzednią
+    #Już jest ta nazwa w parentrecords... Najpierw usuwamy poprzednią
     warning(paste0('object "', name, '" is already present in the exports of the task. Overwriting.'))
     idx<-which(objectnames==name)
     objectrecords[idx]<-NULL
   }
 
-  objectrecords[[name]]<-list(name=name, path=path, compress=compress)
+  objectrecords[[name]]<-list(name=name, archivepath=path, compress=compress, digest=NA, flag_allow_empty=flag_allow_empty)
   metadata$objectrecords<-objectrecords
 
-  assertMetadata(metadata)
+  assertMetadata(metadata, flag_ready_to_run=FALSE)
   return(metadata)
 }
 
+#' Adds a library based on the info on the current system.
+#'
+#' System fills in the
+#' details of the library according to the information found in the current system.
+#'
+#' @param metadata Task metadata
+#' @param library_name Names of the libraries the task uses.
+#'
+#' @return updated metadata
+add_library_entry_simple<-function(metadata, library_name, priority=10) {
+  assertMetadata(metadata, flag_ready_to_run=FALSE)
+  checkmate::assertString(library_name)
 
+  info<-packageDescription(library_name)
+  entry<-list(name=library_name,
+              priority=priority)
+
+  if(is.null(info$RemoteType)) {
+    stop(paste0("We don't support local libraries, because we cannot infer their location.
+                For that use different function"))
+    browser()
+    return(metadata)
+  }
+  entry$version<-info$Version
+  if(info$RemoteType=='cran') {
+    entry$source_type<-'cran'
+    entry$source_address<-''
+  } else if (info$RemoteType=='github') {
+    entry$source_type<-'github'
+    entry$source_address<-paste0(info$RemoteUsername,'/', info$RemoteRepo, '@', info$RemoteRef)
+  } else {
+    browser() #Unknown source type
+  }
+
+
+  if(library_name %in% names(libraries)) {
+    ex_entry<-libraries[[library_name]][c('version', 'source_type', 'source_address')]
+    new_entry<-entry[c('version', 'source_type', 'source_address')]
+    if(!identical(ex_entry, new_entry)) {
+      warning(paste0("Library ", library_name, " is already devclared. Updating the information from ",
+                     summary(ex_entry), " to ", summary(new_entry)))
+    }
+  }
+  libraries[[library_name]]<-entry
+  metadata$libraries<-libraries
+  return(metadata)
+}
 
 append_history_record<-function(metadata, timestamp, walltime, cputime, systemtime, cpumodel,
                                 membefore, memafter, corecount, virtualcorecount,

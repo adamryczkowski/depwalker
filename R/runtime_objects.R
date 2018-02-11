@@ -265,7 +265,7 @@ get_runtime_index_path<-function(taskpath) {
 #' @return modified \code{metadata} argument that includes additional runtime objects definition. Nothing will get
 #'        actually saved to disk (for this use make.sure.metadata.is.saved)
 #' @export
-#' @seealso \code{\link{create.metadata}}, \code{\link{add.parent}}
+#' @seealso \code{\link{create_metadata}}, \code{\link{add_parent}}
 #' @export
 set_runtime_objects<-function(metadata,
                               objectnames, environment, default_save_directory_suffix='',
@@ -511,7 +511,7 @@ infer_save_locations<-function(metadata, objectnames, environment, default_save_
 #' @return modified \code{metadata} argument that includes additional runtime objects definition. Nothing will get
 #'        actually saved to disk (for this use make.sure.metadata.is.saved)
 #' @export
-#' @seealso \code{\link{create.metadata}}, \code{\link{add.parent}}
+#' @seealso \code{\link{create_metadata}}, \code{\link{add_parent}}
 #' @export
 add_runtime_objects<-function(metadata, objects, save_location=NULL, forced_save_filenames=character(0),
                               forced_separate_files, compress='gzip', .ignored_objects=character(0))
@@ -617,7 +617,7 @@ add_runtime_objects<-function(metadata, objects, save_location=NULL, forced_save
 #' @return modified \code{metadata} argument that includes additional runtime objects definition. Nothing will get
 #'        actually saved to disk (for this use make.sure.metadata.is.saved)
 #' @export
-#' @seealso \code{\link{create.metadata}}, \code{\link{add.parent}}
+#' @seealso \code{\link{create_metadata}}, \code{\link{add_parent}}
 #' @export
 add_ignored_runtime_objects<-function(metadata, objects)
 {
@@ -725,7 +725,7 @@ add_ignored_runtime_objects<-function(metadata, objects)
 #' @return modified \code{metadata} argument that includes additional runtime objects definition. Nothing will get
 #'        actually saved to disk (for this use make.sure.metadata.is.saved)
 #' @export
-#' @seealso \code{\link{create.metadata}}, \code{\link{add.parent}}
+#' @seealso \code{\link{create_metadata}}, \code{\link{add_parent}}
 #' @export
 remove_runtime_objects<-function(metadata, objects)
 {

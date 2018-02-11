@@ -4,7 +4,7 @@ assertMetadata<-function(metadata, flag_ready_to_run=TRUE)
                  'inputfiles', 'inputobjects_storage', 'inputobjects',
                  'parents', 'objectrecords_storage',  'objectrecords',
                  'runtime_environment', 'execution_directory',
-                 'flag_never_execute_parallel',
+                 'flag_never_execute_parallel', 'flag_include_global_env', 'libraries',
                  'flag_use_tmp_storage', 'flag_force_recalculation', 'timecosts')
   if(length(setdiff(names(metadata), valid_items))>0) {
     stop(paste0("Unkown components of the metadata: ",
@@ -61,25 +61,43 @@ assertMetadata<-function(metadata, flag_ready_to_run=TRUE)
   checkmate::assertFlag(metadata$flag_never_execute_parallel)
   checkmate::assertFlag(metadata$flag_use_tmp_storage)
   checkmate::assertFlag(metadata$flag_force_recalculation)
+  checkmate::assertFlag(metadata$flag_include_global_env)
 
+  checkmate::assertList(metadata$libraries)
+  for (library in metadata$libraries)
+  {
+    assertLibraryMetadata(library, metadata)
+  }
 
+  checkmate::assertList(metadata$timecosts)
+  if(length(metadata$timecosts)>0) {
+    dt<-objectstorage::lists_to_df(metadata$timecosts, list_columns = 'output')
+    cols<-c('timestamp', 'walltime', 'cputime', 'systemtime','cpumodel', 'membefore',
+            'memafter', 'corecount', 'virtualcorecount', 'flag_success')
+    test_for_elements(colnames(dt), cols, optional_items = 'output')
+  }
 
-  checkmate::assertDataFrame(metadata$timecosts)
-  cols<-c('walltime', 'cputime', 'systemtime','cpumodel', 'membefore',
-          'memafter', 'corecount', 'virtualcorecount', 'busycpus')
-  if (!all(cols %in% colnames(metadata$timecosts)))
-    stop("Insufficient columns in metadata$timecosts data.frame")
+}
+
+test_for_elements<-function(colnames, required_items, optional_items=character(0)) {
+  if(!identical(intersect(colnames, required_items), required_items)) {
+    stop(paste0("There following required columns are missing: ",
+                paste0(setdiff(required_items, colnames), collapse = ', ')))
+  }
+  if(length(setdiff(colnames, c(required_items, optional_items) ))>0) {
+    stop(paste0("The following columns are unexpected: ",
+                paste0(setdif(colnames, c(required_items, optional_items)), collapse = ', ')))
+  }
 
 }
 
 assertInputFilesMetadata<-function(inputfiles, metadata)
 {
   valid_items<-c('path', 'flag_checksum', 'type', 'digest')
+  optional_items<-c('code')
 
-  if(length(setdiff(names(inputfiles), valid_items))>0) {
-    stop(paste0("Unkown components of the inputfiles: ",
-                paste0(setdiff(names(inputfiles), valid_items)), collapse=', '))
-  }
+  test_for_elements(names(inputfiles), required_items = valid_items, optional_items = optional_items)
+
   assertValidPath(inputfiles$path)
 
   checkmate::assert_flag(inputfiles$flag_checksum)
@@ -87,16 +105,16 @@ assertInputFilesMetadata<-function(inputfiles, metadata)
   assertSourceType(inputfiles$type)
 
   assertDigest(inputfiles$digest)
+
+  if('code' %in% names(inputfiles)) {
+    checkmate::assertCharacter(inputfiles$code)
+  }
 }
 
 assertInputObjectMetadata<-function(inputrecord, metadata)
 {
   valid_items<-c('name', 'ignored', 'digest')
-
-  if(length(setdiff(names(inputrecord), valid_items))>0) {
-    stop(paste0("Unkown components of the inputrecord: ",
-                paste0(setdiff(names(inputrecord), valid_items)), collapse=', '))
-  }
+  test_for_elements(names(inputrecord), valid_items)
 
   assertVariableName(inputrecord$name)
   checkmate::assert_logical(inputrecord$ignored)
@@ -106,6 +124,9 @@ assertInputObjectMetadata<-function(inputrecord, metadata)
 
 assertParentRecordMetadata<-function(parentrecord, metadata)
 {
+  valid_items<-c('path', 'names', 'aliasnames', 'objectdigests')
+  test_for_elements(names(parentrecord), valid_items)
+
   assertVariableNames(parentrecord$names)
   assertVariableNames(parentrecord$aliasnames)
   path=get_path(metadata, parentrecord$path, extension='metadata')
@@ -118,20 +139,27 @@ assertParentRecordMetadata<-function(parentrecord, metadata)
 
 assertObjectRecordMetadata<-function(objectrecord, metadata)
 {
-  valid_items<-c('name', 'archivepath', 'compress', 'digest')
+  valid_items<-c('name', 'archivepath', 'compress', 'digest', 'flag_allow_empty')
+  test_for_elements(names(objectrecord), valid_items)
 
-  if(length(setdiff(names(objectrecord), valid_items))>0) {
-    stop(paste0("Unkown components of the objectrecord: ",
-                paste0(setdiff(names(objectrecord), valid_items)), collapse=', '))
-  }
 
   assertVariableName(objectrecord$name)
-  path=get_path(metadata, objectrecord$path)
+  path=get_path(metadata, objectrecord$archivepath)
   assertValidPath(path)
   assertCompress(objectrecord$compress)
   assertDigest(objectrecord$digest, flag_allow_empty = TRUE)
 }
 
+assertLibraryMetadata<-function(library, metadata)
+{
+  valid_items<-c('name', 'priority', 'version', 'source_type', 'source_address')
+  test_for_elements(names(objectrecord), valid_items)
+
+  assertVariableName(library$name)
+  checkmate::assert_number(library$priority)
+  compareVersion(library$version,'1.0.0')
+  assertLibraryType(library$source_type, library$source_address)
+}
 
 assertMtime<-function(mtime)
 {
@@ -140,15 +168,6 @@ assertMtime<-function(mtime)
 }
 
 
-assertDigest<-function(digest, flag_allow_empty=FALSE)
-{
-  if(is.na(digest)) {
-    if(!flag_allow_empty) {
-      stop("Empty digest not allowed!")
-    }
-  }
-  checkmate::assertString(digest, pattern = '^[0-9a-f]{32}$')
-}
 
 assertVariableName<-function(varname)
 {
@@ -180,7 +199,21 @@ assertCompress<-function(compress) {
 }
 
 assertSourceType<-function(type) {
-  checkmate::assertChoice(inputfiles$type, c('R', 'RMain', 'txt', 'binary'))
+  checkmate::assertChoice(type, c('R', 'RMain', 'txt', 'binary'))
+}
+
+assertLibraryType<-function(type, address) {
+  checkmate::assertChoice(type, c('local', 'github', 'none', 'cran'))
+  checkmate::assertString(address)
+  if(type=='local') {
+    assertValidPath(address)
+  } else if (type=='github') {
+    checkmate::assertString(address, pattern="$[[:alpha:]][[:alnum:]]*/[[:alpha:]][[:alnum:]](@[[:alpha:]][[:alnum:]])?$")
+  } else if (type=='cran') {
+    checkmate::assert_true(address=='')
+  } else {
+    browser()
+  }
 }
 
 assertValidPath<-function(path)
@@ -193,8 +226,14 @@ assertFileExists<-function(path)
   checkmate::assert_file_exists(path)
 }
 
-assertDigest<-function(digest)
+assertDigest<-function(digest, flag_allow_empty=FALSE)
 {
+  if(is.na(digest)) {
+    if(!flag_allow_empty) {
+      stop("Empty digest not allowed!")
+    }
+    return()
+  }
   checkmate::assertString(digest, pattern = '^[0-9a-f]{32}$')
 }
 

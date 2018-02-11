@@ -37,9 +37,15 @@
 #' \item{\strong{source_files_mismatch}}{Named list with reasons of mismatch for each source file. Main source file has a name '/'.
 #'                                  Some of the source files have been replaced/changed since the task has been run the last time.
 #'                                  \code{info} contain a list of those changed files.}
+#' \item{\strong{too_many_libraries}}{The task for which computations were done has more libraries as dependency than our task.
+#'                                  \code{info} contain a list of those libraries}
+#' \item{\strong{too_little_libraries}}{The task for which computations were done has less libraries as dependency than our task.
+#'                                    \code{info} contain a list of those missing dependencies. }
+#' \item{\strong{libraries_mismatch}}{Different libraries versions.
+#'                                  \code{info} contain a list of those mismatces.}
 #'}
 #'
-why.cached.value.is.stale<-function(m) {
+why_cached_value_is_stale<-function(m) {
   out<-list()
   actual_hashes<-calculate_task_state_digest(m, flag_full_hash = TRUE)
 
@@ -88,8 +94,6 @@ why.cached.value.is.stale<-function(m) {
   } else {
     out$parents_mismatch<-list(verdict=FALSE)
   }
-
-
 
 
   if(length(actual_hashes$runtime) != length(m$inputobject)) {
@@ -199,6 +203,35 @@ why.cached.value.is.stale<-function(m) {
   } else {
     out$source_files_mismatch<-list(verdict=FALSE)
   }
+
+
+
+
+
+
+
+
+
+  if(length(actual_hashes$libraries) != length(m$libraries)) {
+    more<-setdiff(names(actual_hashes$libraries), names(m$libraries))
+    less<-setdiff(names(m$libraries), names(actual_hashes$libraries))
+    if(length(more)>0) {
+      out$too_many_libraries<-list(verdict=TRUE, info=more)
+    } else {
+      out$too_many_libraries<-list(verdict=FALSE)
+    }
+    if(length(less)>0) {
+      out$too_little_libraries<-list(verdict=TRUE, info=less)
+    } else {
+      out$too_little_libraries<-list(verdict=FALSE)
+    }
+  } else {
+    out$too_little_libraries<-list(verdict=FALSE)
+    out$too_many_libraries<-list(verdict=FALSE)
+  }
+
+
+
   return(out)
 }
 
@@ -208,8 +241,8 @@ why.cached.value.is.stale<-function(m) {
 #' @return Returns \code{TRUE} if cached value is stale, \code{FALSE} if it isn't and
 #' \code{NA} if it cannot decide (maybe because the statistics were overwritten).
 #'
-is.cached.value.stale<-function(m) {
-  ans<-why.cached.value.is.stale(m)
+is_cached_value_stale<-function(m) {
+  ans<-why_cached_value_is_stale(m)
 
   # nested_items<-c('parents_mismatch', 'runtime_objects_mismatch', 'source_files_mismatch')
   # nonnested_items<-setdiff(names(ans), nested_items)
@@ -240,6 +273,7 @@ is.cached.value.stale<-function(m) {
 
 
 #Calculates the actual task state hash, that can be used to infer if its definition has changed and there is a need to recalculate all descendants
+#It is a list
 calculate_task_state_digest<-function(m, flag_full_hash=FALSE, flag_include_objectrecords=FALSE) {
   #The function gets the following pieces of the puzzle:
   # If the task_state_digest executed on each parent gives the same digest as recorded in the metadata
@@ -249,7 +283,7 @@ calculate_task_state_digest<-function(m, flag_full_hash=FALSE, flag_include_obje
     for(p in parents) {
       path<-get.parentpath(p, m, flag_include_extension=FALSE)
       ans<-tryCatch(
-        load.metadata(path),
+        load_metadata(path),
         error=function(e){e}
       )
       if('error' %in% ans) {
@@ -330,6 +364,24 @@ calculate_task_state_digest<-function(m, flag_full_hash=FALSE, flag_include_obje
   }
 
 
+  if(length(libraries)>0) {
+    libraries_df<-objectstorage::lists_to_df(m$libraries)
+    #The smart line below makes cannonical form of the priorities, be retaining only
+    #the ordering. It is very similar to rank, but makes the values integers (without fractional part)
+    libraries_df$priority<-as.integer(as.factor(libraries_df$priority))
+    libraries_df<-dplyr::arrange(libraries_df, name)
+    out_libraries<-list()
+    out<-rep('', nrow(libraries_df))
+    for(i in seq(nrow(libraries_df))) {
+      ans<-paste0(libraries_df$priority[[i]], ":", libraries_df$name[[i]],
+                  "@", libraries_df$version[[i]])
+      out[[i]]<-digest::digest(ans, serialize = FALSE)
+    }
+    libraries_df$hash<-out
+    out_libraries<-as.list(setNames(libraries_df$hash, libraries_df$name))
+  } else {
+    out_libraries<-list()
+  }
 
   # If the code digest of each input file is the same as recorded in the metadata
 
@@ -378,11 +430,17 @@ calculate_task_state_digest<-function(m, flag_full_hash=FALSE, flag_include_obje
     ans<-list(parents=out_parents,
               runtime=out_runtime,
               code=out_code,
+              libraries=out_libraries,
               objectrecords=d)
   } else {
     ans<-list(parents=out_parents,
               runtime=out_runtime,
-              code=out_code)
+              code=out_code,
+              libraries=out_libraries)
+  }
+
+  if(length(m$libraries)>0) {
+
   }
 
   if(flag_full_hash) {

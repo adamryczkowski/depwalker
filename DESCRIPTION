@@ -1,7 +1,7 @@
 Package: depwalker
 Type: Package
 Title: Dependency Tracking System for R Scripts
-Version: 0.1.0
+Version: 0.9.1
 Author: Adam Ryczkowski
 Maintainer: <adam@statystyka.net>
 Description: Allows declarations of dependencies (order of execution) between R scripts.

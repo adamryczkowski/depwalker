@@ -5,34 +5,34 @@ library(testthat)
 
 source('testfunctions.R')
 
-test_that("Test create metadata (1)", expect_equal_to_reference({
-    tempdir<-'/tmp';
-    code<-"x<-1:10";
-    depwalker:::create.metadata(code, file.path(tempdir,"task1"))
+test_that("Test for memory-only metadata (1)", expect_equal_to_reference({
+  m<-depwalker::create_metadata(name = 'task1')
+  code<-"x<-1:10";
+  m<-depwalker::add_source_file(m, code=code)
+  m<-depwalker::add_objectrecord(m, 'x')
+  m<-depwalker::add_
+  #saveRDS(m, 'metadata1_pre.rds')
   }, 'metadata1_pre.rds'))
 
-test_that("Test for digest equivalence of metadata", expect_equal({
-    code<-"x<-1:10";
-    m<-depwalker:::create.metadata(code, file.path(tmpdir,"task1"));
-    depwalker:::metadata.digest(m)
-  },
-  "560ab6052c5dadfa94d8767097f98958"
-))
-
-test_that("Test for adding object record (1)", expect_equal_to_reference({
-  tempdir<-'/tmp';
-  m<-testf1(tempdir);
-},"metadata1.rds"))
+# test_that("Test for digest equivalence of metadata", expect_equal({
+#     code<-"x<-1:10";
+#     m<-depwalker:::create.metadata(code, file.path(tmpdir,"task1"));
+#     depwalker:::metadata.digest(m)
+#   },
+#   "560ab6052c5dadfa94d8767097f98958"
+# ))
 
 test_that("Test for adding another object record (1)", expect_warning({
+  m<-depwalker::create_metadata(name = 'task1')
   code<-"x<-1:10";
-  m<-depwalker:::create.metadata(code, file.path(tmpdir, "task1"));
-  m<-depwalker:::add.objectrecord(m,"x",file.path(tmpdir, "x"));
-  m<-depwalker:::add.objectrecord(m,"x",file.path(tmpdir, "x"));
+  m<-depwalker::add_source_file(m, code=code)
+  m<-depwalker::add_objectrecord(m, 'x')
+  m<-depwalker::add_objectrecord(m, 'x')
+  expect_true(depwalker:::is_inmemory(m))
 },regexp='object "x" is already present in the exports of the task. Overwriting.'))
 
 test_that("Save and read simple metadata (1)", {
-    m<-readRDS('metadata1.rds');
+    m<-readRDS('metadata1_pre.rds');
     depwalker:::make.sure.metadata.is.saved(m);
     m2<-depwalker:::load.metadata(m$path);
     testthat::expect_equal(depwalker:::metadata.digest(m),depwalker:::metadata.digest(m2))

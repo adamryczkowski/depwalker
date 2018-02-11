@@ -16,7 +16,7 @@
 #'
 #' @param metadata metadata object that you want to make sure is saved on disk.
 #' @param path Directory where the metadata and its dependant objects should be save to.
-#'        Defaults to the current directory.
+#'        Defaults to the current directory. If relative - it will be prefixed with the current directory.
 #' @param flag_save_in_background If set, the actual compression will happen in the forked thread. The task
 #'        will be locked from execution until the save finishes.
 #' @param flag_use_tmp_storage Relevant only if runtime objects are present and user selects 'xz' compression,
@@ -36,76 +36,121 @@
 #'   it returns the saved metadata.
 #' @export
 #' @seealso \code{\link{save.metadata}} - unconditionally saves task's metadata on disk.
-make.sure.metadata.is.saved<-function(metadata, path=NULL, flag_save_in_background=FALSE,
-                                      flag_use_tmp_storage = FALSE,
+make_sure_metadata_is_saved<-function(metadata, path=NULL, flag_save_in_background=FALSE,
+                                      flag_use_tmp_storage = FALSE, on_overwrite='fail',
                                       parallel_cpus=NULL, flag_wait=TRUE, flag_check_hash=TRUE)
 {
-  assertMetadata(metadata)
-
-  browser()
-  #TODO: Niech zapis metadata oznaczać będzie następujące rzeczy:
-  #1. Sprawdź, czy mamy statystyki.
-  #      Jeśli nie, to wczytaj metadata z dysku i sprawdź,
-  #      czy zmienił się hash. Jeśli się nie zmienił,
-  #      to wczytaj statystyki z dysku i doczep do naszych.
-  #2. Jeśli u nas jest ścieżka relatywna i podano path, to użyj parents jako prefiksu dla naszej i
-  #   nadpisz ścieżkę do parents (bo mogła się zmienić, jeśli jest relative).
-  #3. Zapisz wszystkie niezapisane inputfiles
-  #4. Zapisz/zaktualizuj obiekty inputobjects
-  #5. Jeśli nasza metadata się zmieniła względem starej, to upewnij się, że objectrecords storage
-  #   jest puste.
-
+  assertMetadata(metadata=metadata, flag_ready_to_run=TRUE)
+  checkmate::checkChoice(on_overwrite, choices=c('fail','warn','ignore'))
   if(is.null(path)) {
-    metadata.path<-get_path(metadata, basename(metadata$path))
-  } else {
-    metadata.path<-pathcat::path.cat
+    path<-''
   }
-
-  checkmate::assertPathForOutput(metadata.path, overwrite=TRUE)
-
-  if(!flag_save_in_background) {
-    parallel_cpus<-0
-  }
-
-  if (file.exists(paste0(metadata.path,getOption('depwalker.metadata_save_extension'))))
-    metadata.disk<-load.metadata(metadata.path)
-  else
-    metadata.disk<-NULL
-
-  if (length(metadata$objectrecords)==0)
-  {
-    warning("Saving task without any exported R object. Such tasks are pretty useless")
-  }
-
-  if(is.null(metadata.disk))
-  {
-    metadata<-save_metadata(m=metadata,
-                            flag_use_tmp_storage = flag_use_tmp_storage, parallel_cpus = parallel_cpus,
-                            flag_wait = flag_wait, flag_check_hash = flag_check_hash)
-    return(metadata)
-  } else
-  {
-    ans<-are.two.metadatas.equal(m1 = metadata, m2 = metadata.disk)
-    if (ans)
-    {
-      metadata$timecosts <- metadata.disk$timecosts
-
-      metadata.new<-join.metadatas(base_m = metadata.disk, extra_m = metadata)
-      if (!is.null(metadata.new))
-      {
-        save_metadata(m=metadata,
-                      flag_use_tmp_storage = flag_use_tmp_storage, parallel_cpus = parallel_cpus,
-                      flag_wait = flag_wait, flag_check_hash = flag_check_hash)
-        return(metadata.new)
-      }
-      return(metadata.disk)
+  flag_clear_on_dist<-FALSE
+  newpath<-paste0(pathcat::path.cat(getwd(), path), getOption('depwalker.metadata_save_extension'))
+  if(!is_inmemory(metadata)) {
+    if (get_path(metadata, path)!=get_path(metadata, metadata$path)) {
+      stop("We still don't support re-writing already saved task. ")
     } else {
-      metadata<-save_metadata(m=metadata,
-                              flag_use_tmp_storage = flag_use_tmp_storage, parallel_cpus = parallel_cpus,
-                              flag_wait = flag_wait, flag_check_hash = flag_check_hash)
-      return(metadata)
+      if(file.exists(newpath)) {
+        if(is_cached_value_stale(metadata)) {
+          if(on_overwrite=='fail') {
+            stop(paste0("The task will overwrite previously saved task. "))
+          }
+          if(on_overwrite=='warn') {
+            warning(paste0("The task will overwrite previously saved task. "))
+          }
+        } else {
+          #2. Sprawdź, czy mamy statystyki.
+          #      Jeśli nie, to wczytaj metadata z dysku i sprawdź,
+          #      czy zmienił się hash. Jeśli się nie zmienił,
+          #      to wczytaj statystyki z dysku i doczep do naszych.
+          oldmetadata<-load_metadata(newpath)
+          metadata$history<-oldmetadata$history
+          flag_clear_on_dist<-TRUE
+        }
+      }
     }
   }
+
+  #1. Jeśli u nas jest ścieżka relatywna i podano path, to użyj parents jako prefiksu dla naszej i
+  #   nadpisz ścieżkę do parents (bo mogła się zmienić, jeśli jest relative).
+  if(is_inmemory(metadata) && path!='' && length(metadata$parents)>0 ) {
+    for(i in seq_along(metadata$parents)) {
+      parent<-metadata$parents[[i]]
+      if(!pathcat::is_absolute_path(parent$path)) {
+        metadata$parents[[i]]<-NULL
+        oldshortpath<-parent$path
+        oldpath<-get_path(metadata, parent$path)
+        newpath<-pathcat::make.path.relative(base.path = path, target.path = oldpath)
+        parent$path<-newpath
+        metadata[[newpath]]<-parent
+        warning(paste0("Rewriting relative path to parent ", oldshortpath, "=>", newpath,". "))
+      }
+    }
+  }
+
+  tryCatch({
+    lock<-acquire_lock(metadata)
+
+
+    if(length(metadata$inputfiles)>0) {
+      leave_inputfiles<-names(metadata$inputfiles)
+    } else {
+      leave_inputfiles<-character(0)
+    }
+
+    #Deleting all irrelevant parts
+    if(flag_clear_on_dist) {
+      delete_metadata(newpath, flag_leave_intputobjects = TRUE, leave_inputfiles = leave_inputfiles, flag_dont_lock=TRUE)
+    }
+
+
+    #Saving history logs
+    write_history_output_file(metadata)
+
+    #Saving inputobjects
+    if(length(metadata$inputobjects)>0) {
+      all_objects<-objectstorage::lists_to_df(metadata$inputobjects)
+      all_objects<-dplyr::filter(all_objects, ignored==FALSE)
+      all_objects<-all_objects$name
+      objectrecords_storage<-get_path(metadata, metadata$objectrecords_storage, extension = 'objectstorage')
+      if(!file.exists(objectrecords_storage)) {
+        objectstorage::create_objectstorage(objectrecords_storage)
+      }
+      objst_items<-objectstorage::list_runtime_objects(objectrecords_storage)$objectname
+
+
+      objectstorage::modify_runtime_objects(storagepath = objectrecords_storage, obj.environment = metadata$runtime_environment,
+                                            objects_to_add = all_objects,
+                                            objects_to_remove = setdiff(objst_items, all_objects))
+    }
+
+    #Saving inputfiles
+    if(length(metadata$inputfiles)>0) {
+      for(inputfile in metadata$inputfiles) {
+        if('code' %in% names(inputfile)) {
+          path<-get_path(metadata, inputfile$path)
+          writeLines(text=inputfile$code, con = path)
+        }
+      }
+    }
+
+    last_history<-get_last_history_statistics(metadata)
+    if(!is.null(last_history)) {
+      if('output' %in% names(last_history)) {
+        output<-normalize_text_string(last_history$output)
+        check_if_different_file(path='?', contents=output)
+        tmpfile<-tempfile()
+        writeLines(text = tmpfile)
+      }
+    }
+
+    save.metadata(metadata)
+
+  },
+  finally = function(e) {release_lock(metadata)} )
+  assertMetadata(metadata)
+
 }
 
 
@@ -224,7 +269,7 @@ save_runtime_objects<-function(m, parallel_cpus=parallel::detectCores(), flag_wa
                                      parallel_cpus = parallel_cpus)
 }
 
-#' Function called by make.sure.metadata.is.saved to save all the runtime objects stored in m
+#' Function called by make_sure_metadata_is_saved to save all the runtime objects stored in m
 #' By default all small objects will kept together, and large objects will live in a separate files.
 #'
 #' @param metadata already created metadata with 'runtime.environment' with all the objects to save.
@@ -239,7 +284,7 @@ save_runtime_objects<-function(m, parallel_cpus=parallel::detectCores(), flag_wa
 #'        mtime, but size and hash (md5) of the serialized object.
 #' @return Returns TRUE if successfull
 #' @export
-#' @seealso \code{\link{create.metadata}}, \code{\link{add.parent}}
+#' @seealso \code{\link{create_metadata}}, \code{\link{add_parent}}
 #
 save_metadata<-function(m, flag_use_tmp_storage = FALSE,
                                parallel_cpus=parallel::detectCores(), flag_wait=FALSE) {
@@ -257,4 +302,90 @@ save_metadata<-function(m, flag_use_tmp_storage = FALSE,
   }
 
 
+}
+
+
+#' Removes all traces of the metadata from disk
+#'
+#' It removes the following files:
+#'
+#' \itemize{
+#' \item{inputobjects}
+#' \item{stored on disk cached objects}
+#' \item{inputfiles specified by relative path}
+#' \item{error logs}
+#' \item{normal runtime logs}
+#' \item{metadata YAML file itself}
+#' }
+#'
+#' Execution is guarded by the metadata's lock.
+#'
+#' @param metadata The metadata object or path to it
+#' @param flag_leave_intputobjects If set, we will not delete inputobjects nor inputfiles. It is usefull when
+#'        overwriting one task with another, possibly simmilar.
+#' @return NULL
+delete_metadata<-function(metadata, flag_leave_intputobjects=FALSE, flag_remove_inputfiles=FALSE,
+                          leave_inputfiles=character(0),
+                          flag_dont_lock=FALSE) {
+  if('character' %in% class(metadata)) {
+    metadata<-load_metadata(metadata)
+  }
+
+
+  tryCatch({
+    if(!flag_dont_lock) {
+      lock<-acquire_lock(metadata)
+    }
+    #Task removal require removing any linked objects
+    #1. inputobjects - always
+    #2. inputfiles if the path is relative
+    #3. objectrecords - always
+    #4. output
+
+    inputobjects_storage<-get_path(metadata, metadata$inputobjects_storage, extension = 'objectstorage')
+    if(!flag_leave_intputobjects) {
+      #1. inputobjects
+      if(file.exists(inputobjects_storage)) {
+        objectstorage::remove_all(inputobjects_storage)
+      }
+    }
+
+    #2. inputfiles if the path is relative
+    if(flag_remove_inputfiles) {
+      for(i in seq_along(metadata$inputfiles)) {
+        inputfile<-metadata$inputfiles[[i]]
+        if(!pathcat::is_absolute_path(inputfile) && !inputfile %in% leave_inputfiles ) {
+          unlink(inputfile)
+        }
+      }
+    }
+
+    #3. objectrecords - always
+    objectrecords_storage<-get_path(metadata, metadata$objectrecords_storage, extension = 'objectstorage')
+    if(file.exists(objectrecords_storage)) {
+      objectstorage::remove_all(objectrecords_storage)
+    }
+
+    #4. output
+    path<-get_path(metadata, metadata$path, extension = 'err_output')
+    if(file.exists(path)) {
+      unlink(path)
+    }
+    path<-get_path(metadata, metadata$path, extension = 'output')
+    if(file.exists(path)) {
+      unlink(path)
+    }
+
+    #5. Metadata themselves
+    path<-get_path(metadata, metadata$path, extension = 'metadata')
+    if(file.exists(path)) {
+      unlink(path)
+    }
+  },
+  finally = function(e) {
+    if(!flag_dont_lock) {
+      release_lock(metadata)
+    }
+  })
+  NULL
 }

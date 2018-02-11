@@ -24,7 +24,7 @@
 #' Step 1.
 #'
 #' After you set up all tasks in \code{depwalker}, when you want to display regression results from step 5 all
-#' you need to do, is to require results from step 5 with something like \code{load.object('/path/to/step 5')}.
+#' you need to do, is to require results from step 5 with something like \code{load_object('/path/to/step 5')}.
 #'
 #' Computer will take the shortest and fastest possible path to bring you the current results. You don't need to worry
 #' to remember to re-do WoE coding after you added an extra independent variable. You don't need to wait the whole
@@ -34,11 +34,11 @@
 #'
 #' User scripts are pieces of R code, that are declared in \code{depwalker} as a certain task.
 #' User scripts can be run for their side effects, or for the objects they create in R memory. In the latter case,
-#' you need to declare all target objects of your script as well, with \code{add.objectrecord(...)}.
+#' you need to declare all target objects of your script as well, with \code{add_objectrecord(...)}.
 #' All non-declared objects will be purged after
 #' the script run to save precious memory. Every declared target object can be used as a dependency for another
 #' script you may write. User scripts may need certain objects to be already present in the R memory. In such case
-#' you should declare dependencies ('parents', 'ancestors') to your scripts with \code{add.parent(...)}.
+#' you should declare dependencies ('parents', 'ancestors') to your scripts with \code{add_parent(...)}.
 #' Every time, when you require run of your script and cached version of the objects it produces
 #' are not available, it will first executeall dependencies (or just load a cached version of them).
 #'
@@ -63,7 +63,7 @@
 #' \describe{
 #' \item{\strong{path}}{Only in memory. Path with the saved version of this metadata.
 #'                      It is also a folder that all relative paths are based on.
-#'                      For metadata only in memory, it can be relative, otherwise it is absolute.
+#'                      For metadata only in memory, it can be relative, otherwise it must be absolute.
 #'                      If relative, it is assumed to be relative to the current directory}
 #' \item{\strong{inputfiles}}{Optional dictionary with all the external files managed by the main R script.
 #'       These may be source files
@@ -92,6 +92,10 @@
 #' \item{flag_use_tmp_storage}{Boolean flag. If set, it indicates that the task's path is slow to write, and
 #'       all large uncompressed files will be first saved into the \code{/tmp}, and then saved into the
 #'       destination path.}
+#' \item{flag_include_global_env}{Boolean flag. Normally the task is run in the environment that includes only base packages
+#'       and manually specified libraries. If you want to use the \code{library} or \code{require} functions inside the scripts,
+#'       set this flag to true. As a side effect, all the global objects will also be available for the script.}
+#' \item{libraries}{List of all libraries that will be loaded into the searchpath before running the script.}
 #' \item{history}{List with run statistics and results of this task.}
 #' }
 #'
@@ -113,11 +117,11 @@
 #' \strong{Description of the \code{inputobject} item}:
 #' \describe{
 #' \item{\strong{name}}{Name of the object in the run environment.}
-#' \item{ignored} A flag. If true, then object with this name will never be tracked and all the subsequent
+#' \item{ignored}{A flag. If true, then object with this name will never be tracked and all the subsequent
 #'                elements will be ignored. It is designed for handling optional arguments which presents
 #'                only affects the performance, such as pre-loaded database, which in case it is absent
-#'                can easily be loaded from disk.
-#' \item{\strong{digest}} Digest of the object
+#'                can easily be loaded from disk.}
+#' \item{\strong{digest}}{Digest of the object.}
 #'}
 #'
 #' \strong{Description of the \code{parentrecord} item}:
@@ -126,7 +130,7 @@
 #' \item{\strong{names}}{Names of the imported objects.}
 #' \item{\strong{aliasnames}}{Alternate names of each object, set if our script needs the object produced
 #'       by the imported task in different name.}
-#' \item{\strong(objectdigests}}{Digests of the parent objects, filled in when the parent object is run,
+#' \item{\strong{objectdigests}}{Digests of the parent objects, filled in when the parent object is run,
 #'       to freeze the parent's state and react
 #'       when the parent has changed, invalidating our object}
 #' }
@@ -134,13 +138,31 @@
 #' \strong{Description of the \code{objectrecord} item}:
 #' \describe{
 #' \item{\strong{name}}{Name of object produced by the main R script.}
-#' \item{archivepath}{Optional path to the archive location, where the cached version of the object should be saved
+#' \item{archivepath}{Path to the archive location, where the cached version of the object should be saved
 #'       after execution of the script.
 #'       For large objects it can point to the alternate storage or outside of the
 #'       version-controlled/synchronized directory}
 #' \item{compress}{Compression method. Currently the only methods supported are:
 #'       \code{xz}, \code{bzip2}, \code{gzip} and \code{false}. Defaults to \code{xz}}
-#' \item{\strong{digest}} Digest of the object. Important when this task is a parent.
+#' \item{\strong{digest}}{Digest of the object. Important when this task is a parent.}
+#' \item{flag_allow_empty}{If set, there will be no warning if the script didn't produce this object.}
+#'}
+#'
+#' \strong{Description of the \code{library} item}:
+#' \describe{
+#' \item{\strong{name}}{Name of the library}
+#' \item{\strong{priority}}{Integer that would indicate the order of the library loading.
+#'        Libraries with the least priority will be attached first. }
+#' \item{\strong{version}}{Least version of the library. Task will not support environments older version of
+#'       the library than this.}
+#' \item{source_type}{In case the library is missing, the system can try to load it using the information of this
+#'       parameter. There are 5 possible values: \code{CRAN}, \code{github}, \code{git}, \code{local}, \code{none}}
+#' \item{source_address}{Address of the library. Value depend on the \code{source_type}: \describe{
+#'       \item{CRAN}{empty string}
+#'       \item{github}{"<username>/<reponame>"}
+#'       \item{git}{full URI to the git server}
+#'       \item{local}{path to the repository, can be relative to the task's root}
+#'       \item{none}{empty string}}}
 #'}
 #'
 #' \strong{Description of the \code{history} item}:
@@ -157,7 +179,7 @@
 #' \item{output}{Only in memory. Debug output of the run. It is a character vector. On metadata save it will
 #'       be dumped to the text file.}
 #' \item{flag_success}{Whether or not the run was a success}
-#'
+#'}
 #'
 #'
 #'
@@ -171,16 +193,16 @@ NULL
 .onLoad	<-	function(libname,	pkgname)	{
   op	<-	options()
   op.depwalker	<-	list(
-    object.load.speed	=	630030164/100,
-    object.save.extension	=	".rds",
-    metadata.save.extension	=	".meta.yaml",
-    lock.extension	=	'.lock',
-    echo.extension	=	".log",
-    runtime_objects_index.extension = '.rdx',
-    error.extension	=	'.err.log',
-    reserved_attr_for_hash ='..hash',
-    default.lock.time = 3600, #1 hour
-    tune.threshold_objsize_for_dedicated_archive = 5000 #Results from `studium_save`. It will be 4×this size for 'xz'.
+    depwalker.object_load_speed	=	630030164/100,
+#    depwalker.object_save_extension	=	".rds",
+    depwalker.metadata_save_extension	=	".meta.yaml",
+#    lock.extension	=	'.lock',
+    depwalker.log_extension	=	".log",
+#    runtime_objects_index.extension = '.rdx',
+    depwalker.error_log_extension	=	'.err.log',
+#    reserved_attr_for_hash ='..hash',
+    depwalker.default_lock_time = 3600 #1 hour
+#    tune.threshold_objsize_for_dedicated_archive = 5000 #Results from `studium_save`. It will be 4×this size for 'xz'.
   )
   toset	<-	!(names(op.depwalker)	%in%	names(op))
   if(any(toset))	options(op.depwalker[toset])
