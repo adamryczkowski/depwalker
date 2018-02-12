@@ -45,8 +45,10 @@ assertMetadata<-function(metadata, flag_ready_to_run=TRUE)
     stop(paste0("Objects ", paste0(df$objectname[duplicated(df$objectname)], collapse=', '),
                 " will be duplicated in the task's runtime environemnt."))
   }
-
-  assertValidPath(metadata$objectrecords_storage)
+  checkmate::assert_string(metadata$objectrecords_storage)
+  if(metadata$objectrecords_storage!='') { #Empty string means no caching of results
+    assertValidPath(metadata$objectrecords_storage)
+  }
   checkmate::assertList(metadata$objectrecords)
   for (objectrecord in metadata$objectrecords)
   {
@@ -153,7 +155,7 @@ assertObjectRecordMetadata<-function(objectrecord, metadata)
 assertLibraryMetadata<-function(library, metadata)
 {
   valid_items<-c('name', 'priority', 'version', 'source_type', 'source_address')
-  test_for_elements(names(objectrecord), valid_items)
+  test_for_elements(names(library), valid_items)
 
   assertVariableName(library$name)
   checkmate::assert_number(library$priority)

@@ -50,7 +50,7 @@ why_cached_value_is_stale<-function(m) {
   actual_hashes<-calculate_task_state_digest(m, flag_full_hash = TRUE)
 
 
-
+  #   P A R E N T S
   if(length(actual_hashes$parents) != length(m$parents)) {
     more<-setdiff(names(actual_hashes$parents), names(m$parents))
     less<-setdiff(names(m$parents), names(actual_hashes$parents))
@@ -96,9 +96,10 @@ why_cached_value_is_stale<-function(m) {
   }
 
 
-  if(length(actual_hashes$runtime) != length(m$inputobject)) {
-    more<-setdiff(names(actual_hashes$runtime), names(m$inputobject))
-    less<-setdiff(names(m$inputobject), names(actual_hashes$runtime))
+  #   I N P U T   O B J E C T S
+  if(length(actual_hashes$runtime) != length(m$inputobjects)) {
+    more<-setdiff(names(actual_hashes$runtime), names(m$inputobjects))
+    less<-setdiff(names(m$inputobjects), names(actual_hashes$runtime))
     if(length(more)>0) {
       out$too_many_runtime_objects<-list(verdict=TRUE, info=more)
     } else {
@@ -114,39 +115,33 @@ why_cached_value_is_stale<-function(m) {
     out$too_many_runtime_objects<-list(verdict=FALSE)
   }
 
-  if(length(m$inputobject)>0) {
+  if(length(m$inputobjects)>0) {
     io<-list()
     verdict<-FALSE
-    inputobjects_df<-depwalker:::lists_to_df(m$inputobjects, list_columns=c('name', 'objectdigest', 'size'))
-    inputobjects_df<-tidyr::unnest(inputobjects_df)
-    for(i in seq_along(actual_hashes$runtime)) {
-      objname<-names(actual_hashes$runtime)[[i]]
-      o_disk<-actual_hashes$runtime[[objname]]
-      o<-as.list(inputobjects_df[which(inputobjects_df$name==objname),])
-      if('objectdigest' %in% names(o)){
-        if(o$objectdigest != o_disk$hash) {
-          io[[objname]]<-list(verdict=TRUE)
-          if(!is.na(verdict)){
-            verdict<-TRUE
-          }
-        } else {
-          io[[objname]]<-list(verdict=FALSE)
-        }
-      } else{
-        io[[objname]]<-list(verdict=NA)
-        verdict<-NA
-      }
+    inputobjects_df<-get_inputobjects_as_df(m, flag_include_ignored=FALSE)
+    io_on_disk<-objectstorage::list_runtime_objects(get_inputobjects_storagepath(metadata = m))
+    df<-dplyr::inner_join(inputobjects_df, io_on_disk, by=setNames('objectnames', 'name'), suffix=c("_m", "_o"))
+
+    if(nrow(df)!=length(m$inputobjects)) {
+      browser()
     }
-    out$runtime_mismatch<-list(verdict=verdict, info=io)
+
+    if(nrow(df)==0) browser()
+
+    for(pos in seq(nrow(df))) {
+      io[[df$name[[pos]] ]]<-list(verdict=(df$digest_m[[pos]]!=df$digest_o[[pos]] ))
+    }
+
+    out$runtime_mismatch<-list(verdict=sum(df$digest_m!=df$digest_o)>0, info=io)
   } else {
     out$runtime_mismatch<-list(verdict=FALSE)
   }
 
 
-
-  if(length(actual_hashes$code) != length(m$extrasources)+1) {
-    more<-setdiff(names(actual_hashes$code), c('/', names(m$extrasources)))
-    less<-setdiff(c('/', names(m$extrasources)), names(actual_hashes$code))
+  #    I N P U T   F I L E S
+  if(length(actual_hashes$code) != length(m$inputfiles)) {
+    more<-setdiff(names(actual_hashes$code), names(m$inputfiles))
+    less<-setdiff(names(m$inputfiles), names(actual_hashes$code))
     if(length(more)>0) {
       out$too_many_source_files<-list(verdict=TRUE, info=more)
     } else {
@@ -172,21 +167,13 @@ why_cached_value_is_stale<-function(m) {
   # }
   # cd[['/']]<-list(verdict=verdict)
 
-  if(length(m$extrasources)>0) {
+  if(length(m$inputfiles)>0) {
     for(i in seq_along(actual_hashes$code)) {
       codename<-names(actual_hashes$code)[[i]]
       c_disk<-actual_hashes$code[[codename]]
-      if(codename==m$codepath) {
-        c_mem<-list(path=m$codepath,
-                    flag.checksum=TRUE,
-                    flag.binary=FALSE,
-                    flag.r=TRUE,
-                    digest=m$codeCRC)
-      } else {
-        c_mem<-m$extrasources[[codename]]
-      }
+      c_mem<-m$inputfiles[[codename]]
       if('digest' %in% names(c_mem)){
-        if(c_mem$digest != c_disk$hash) {
+        if(c_mem$digest != c_disk) {
           cd[[codename]]<-list(verdict=TRUE)
           if(!is.na(verdict)){
             verdict<-TRUE
@@ -195,6 +182,7 @@ why_cached_value_is_stale<-function(m) {
           cd[[codename]]<-list(verdict=FALSE)
         }
       } else{
+        browser()
         cd[[codename]]<-list(verdict=NA)
         verdict<-NA
       }
@@ -211,7 +199,7 @@ why_cached_value_is_stale<-function(m) {
 
 
 
-
+  #    L I B R A R I E S
   if(length(actual_hashes$libraries) != length(m$libraries)) {
     more<-setdiff(names(actual_hashes$libraries), names(m$libraries))
     less<-setdiff(names(m$libraries), names(actual_hashes$libraries))
@@ -246,7 +234,7 @@ is_cached_value_stale<-function(m) {
 
   # nested_items<-c('parents_mismatch', 'runtime_objects_mismatch', 'source_files_mismatch')
   # nonnested_items<-setdiff(names(ans), nested_items)
-  # out<-FALSE
+  out<-FALSE
   for(nni in names(ans)) {
     value<-ans[[nni]]$verdict
     if(is.na(value)){
@@ -313,58 +301,24 @@ calculate_task_state_digest<-function(m, flag_full_hash=FALSE, flag_include_obje
   # )
 
   if(length(m$inputobjects)>0) {
-    inputobjects_df<-depwalker:::lists_to_df(m$inputobjects, list_columns=c('name', 'objectdigest', 'size'))
-    inputobjects_df<-purrrlyr::by_row(inputobjects_df, ~length(.$name[[1]]), .collate = 'cols', .to='count')
-    inputobjects_df<-dplyr::arrange(tidyr::unnest(inputobjects_df), name)
+    inputobjects_df<-get_inputobjects_as_df(m)
+    inputobjects_df<-dplyr::filter(inputobjects_df, ignored==FALSE)
+    inputobjects_df<-dplyr::arrange(inputobjects_df, name)
 
-    obj_container<-new.env()
-    inputobjects_df$hash<-NA_character_
-    filehashes<-list()
 
-    if(nrow(inputobjects_df)>0) {
-      for(i in seq(1, nrow(inputobjects_df))) {
-        if(!inputobjects_df$ignored[[i]]) {
-          path<-depwalker:::get.fullpath(m, path=inputobjects_df$path[[i]])
-          if(file.exists(path)) {
-            if(!'path' %in% names(filehashes)){
-              filehashes[[path]]<-tools::md5sum(path)
-            }
-            hash<-filehashes[[path]]
-            if(hash!=inputobjects_df$filedigest[[i]]) {
-              if(inputobjects_df$count[[i]]>1) {
-                if(!inputobjects_df$name[[i]] %in% obj_container) {
-                  objs<-readRDS(path)
-                  if(!'list' %in% class(objs)) {
-                    stop(paste0("Wrong format of the ", path, ". Expected class list"))
-                  }
-                  for(i in seq_along(objs)) {
-                    objname<-names(objs)[[i]]
-                    assign(x = objname, value = objs[[objname]], envir = obj_container)
-                  }
-                  rm('objs')
-                }
-                if(inputobjects_df$name[[i]] %in% obj_container) {
-                  inputobjects_df$hash[[i]]<-calculate.object.digest(inputobjects_df$name[[i]], target.environment=obj_container)
-                  rm(inputobjects_df$name[[i]], envir = obj_container)
-                } else {
-                  stop(paste0("Cannot find object ", inputobjects_df$name[[i]], " in ", inputobjects_df$path[[i]]))
-                }
-              }
-            } else {
-              inputobjects_df$hash[[i]]<-'OK'
-            }
-          }
-        }
-      }
+    existing_inputobjects_df<-objectstorage::list_runtime_objects(inputobjects_storage(m))
+
+    df<-dplyr::inner_join(inputobjects_df, existing_inputobjects_df, by=setNames('objectnames','name'), suffix=c("_m", "_o"))
+    if(nrow(df)!=nrow(inputobjects_df)) {
+      browser()
     }
-    rm(obj_container)
-    out_runtime<-as.list(setNames(inputobjects_df$hash, inputobjects_df$name))
+    out_runtime<-as.list(setNames(df$digest_o, df$name))
   } else {
     out_runtime<-list()
   }
 
 
-  if(length(libraries)>0) {
+  if(length(m$libraries)>0) {
     libraries_df<-objectstorage::lists_to_df(m$libraries)
     #The smart line below makes cannonical form of the priorities, be retaining only
     #the ordering. It is very similar to rank, but makes the values integers (without fractional part)
@@ -391,32 +345,29 @@ calculate_task_state_digest<-function(m, flag_full_hash=FALSE, flag_include_obje
   # } else {
   #   out_code<-list()
   # }
-  out_code<-list()
-  code_files<-depwalker:::get_coding_files(m, flag_expand_paths = FALSE)
-  for(i in seq_along(code_files)) {
-    filename<-code_files[[i]]
-    path<-pathcat::path.cat(dirname(m$path), filename)
-    if(!file.exists(path)) {
-      hash<-simpleError(paste0("Cannot find source text file ", path, "."))
-    } else {
-      hash<-paste0(basename(path), ":", source_file_digest(path))
+
+  files_df<-get_inputfiles_as_df(metadata = m)
+  if(nrow(files_df)>0) {
+    paths<-rep(NA_character_, nrow(files_df))
+    hashes<-rep(NA_character_, nrow(files_df))
+    for(i in seq(nrow(files_df))) {
+      path<-get_path(metadata=m, files_df$path[[i]])
+      if(files_df$type %in% c('RMain', 'R', 'txt') ) {
+        hashes[[i]]<-source_file_digest(path)
+      } else if (files_df$type == 'binary') {
+        hashes[[i]]<-tools::md5sum(path)
+      } else {
+        browser() #Unknown file type
+      }
     }
-    out_code[[filename]]<-list(hash=hash)
+    ord<-order(paths)
+    hashes<-hashes[ord]
+    paths<-files_df$path[ord]
+    out_code<-as.list(setNames(hashes, paths))
+  } else {
+    out_code<-list()
   }
 
-  binary_files<-depwalker:::get_binary_files(m, flag_expand_paths = FALSE)
-  for(i in seq_along(binary_files)) {
-    filename<-binary_files[[i]]
-    path<-pathcat::path.cat(dirname(m$path), filename)
-    if(!file.exists(path)) {
-      hash<-simpleError(paste0("Cannot find source binary file ", path, "."))
-    } else {
-      hash<-tools::md5sum(path)
-    }
-    out_code[[filename]]<-list(hash=hash)
-  }
-
-  out_code<-out_code[order(names(out_code))]
 
 
   if(flag_include_objectrecords) {
@@ -439,9 +390,6 @@ calculate_task_state_digest<-function(m, flag_full_hash=FALSE, flag_include_obje
               libraries=out_libraries)
   }
 
-  if(length(m$libraries)>0) {
-
-  }
 
   if(flag_full_hash) {
     return(ans)

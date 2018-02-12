@@ -24,7 +24,8 @@ create_metadata<-function(name,
                           execution_directory='',
                           flag_never_execute_parallel=FALSE,
                           flag_use_tmp_storage=FALSE,
-                          flag_include_global_env=FALSE)
+                          flag_include_global_env=FALSE,
+                          flag_no_caching=FALSE)
 {
   checkmate::assert_string(name)
   checkmate::assert_true(name!='')
@@ -53,12 +54,19 @@ create_metadata<-function(name,
 
   if(is.null(objectrecords_storage_path)) {
     objectrecords_storage_path<-paste0(basename(metadata$path), '_or')
+  } else {
+    if(flag_no_caching) {
+      stop("flag_no_caching excludes object_storage_path")
+    }
+  }
+  if(flag_no_caching) {
+    objectrecords_storage_path<-''
   }
   #path_to_check<-get_path(metadata, inputobjects_storage_path, input_relative_to='metadata',
   #                       extension='objectstorage')
   #checkmate::assertPathForOutput(dirname(path_to_check), overwrite=TRUE)
 
-  objectrecords_storage_path<-get_path(metadata, inputobjects_storage_path, input_relative_to='metadata',
+  objectrecords_storage_path<-get_path(metadata, objectrecords_storage_path, input_relative_to='metadata',
                                       extension='ignore', return_relative_to='metadata')
   metadata$objectrecords_storage<-objectrecords_storage_path
 
@@ -129,7 +137,7 @@ add_source_file<-function(metadata, filepath=NULL, code=NULL, type='RMain',
     }
   } else {
     if(is.null(filepath)){
-      filepath<-basename(metadata$path)
+      filepath<-get_path(metadata = metadata, basename(metadata$path), return_relative_to = 'metadata', extension = 'R')
     }
   }
 
@@ -315,7 +323,7 @@ add_inputobject<-function(metadata, objectname, object=NULL, flag_ignored=FALSE,
 {
   envir<-new.env()
   assign(x = objectname, value=object, envir=envir)
-  m<-add_inputobjects(metadata=metadata, objectnames = objectname, envir=envir,
+  metadata<-add_inputobjects(metadata=metadata, objectnames = objectname, envir=envir,
                       flag_ignored = flag_ignored, flag_allow_replace = flag_allow_replace)
   return(metadata)
 }
@@ -552,6 +560,7 @@ add_objectrecord<-function(metadata, name, archivepath=NULL, compress='xz', flag
 #' @param library_name Names of the libraries the task uses.
 #'
 #' @return updated metadata
+#' @export
 add_library_entry_simple<-function(metadata, library_name, priority=10) {
   assertMetadata(metadata, flag_ready_to_run=FALSE)
   checkmate::assertString(library_name)
@@ -560,17 +569,25 @@ add_library_entry_simple<-function(metadata, library_name, priority=10) {
   entry<-list(name=library_name,
               priority=priority)
 
-  if(is.null(info$RemoteType)) {
+  if('RemoteType' %in% names(info)) {
+    remote_type<-info$RemoteType
+  } else if ('Repository' %in% names(info)) {
+    remote_type<-tolower(info$Repository)
+  } else {
+    remote_type<-'none'
+  }
+
+  if(remote_type == 'none') {
     stop(paste0("We don't support local libraries, because we cannot infer their location.
                 For that use different function"))
     browser()
     return(metadata)
   }
   entry$version<-info$Version
-  if(info$RemoteType=='cran') {
+  if(remote_type=='cran') {
     entry$source_type<-'cran'
     entry$source_address<-''
-  } else if (info$RemoteType=='github') {
+  } else if (remote_type=='github') {
     entry$source_type<-'github'
     entry$source_address<-paste0(info$RemoteUsername,'/', info$RemoteRepo, '@', info$RemoteRef)
   } else {
@@ -578,16 +595,15 @@ add_library_entry_simple<-function(metadata, library_name, priority=10) {
   }
 
 
-  if(library_name %in% names(libraries)) {
-    ex_entry<-libraries[[library_name]][c('version', 'source_type', 'source_address')]
+  if(library_name %in% names(metadata$libraries)) {
+    ex_entry<-metadata$libraries[[library_name]][c('version', 'source_type', 'source_address')]
     new_entry<-entry[c('version', 'source_type', 'source_address')]
     if(!identical(ex_entry, new_entry)) {
       warning(paste0("Library ", library_name, " is already devclared. Updating the information from ",
                      summary(ex_entry), " to ", summary(new_entry)))
     }
   }
-  libraries[[library_name]]<-entry
-  metadata$libraries<-libraries
+  metadata$libraries[[library_name]]<-entry
   return(metadata)
 }
 

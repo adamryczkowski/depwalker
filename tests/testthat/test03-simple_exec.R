@@ -8,12 +8,19 @@ test_that("Run simple task (1)", expect_equal({
   m<-add_source_file(metadata = m, code = 'x<-a+10')
   m<-add_inputobject(m, objectname = 'a', object = 12)
   m<-add_objectrecord(m, name='x')
+  m<-add_library_entry_simple(m, 'Hmisc')
+  debugonce(depwalker:::release_lock)
+  m<-make_sure_metadata_is_saved(m, path = '/tmp/task1')
 
-  make_sure_metadata_is_saved(m, path = '/tmp')
+  #debugonce(depwalker:::is_cached_value_stale)
+  depwalker:::is_cached_value_stale(m)
 
   testf1(tmpdir);
   #system(paste0('nemo ', tmpdir))
-  m<-depwalker:::load.metadata(file.path(tmpdir, "task1"));
+  m<-load_metadata(file.path('/tmp/task1', "simple_task"))
+
+
+
   if (exists('x',envir=.GlobalEnv))
     rm('x',envir=.GlobalEnv)
   depwalker:::get.object(metadata=m,

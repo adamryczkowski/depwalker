@@ -3,6 +3,7 @@
 export(add_ignored_runtime_objects)
 export(add_inputobject)
 export(add_inputobjects)
+export(add_library_entry_simple)
 export(add_objectrecord)
 export(add_parent)
 export(add_runtime_objects)

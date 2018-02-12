@@ -46,7 +46,7 @@ make_sure_metadata_is_saved<-function(metadata, path=NULL, flag_save_in_backgrou
     path<-''
   }
   flag_clear_on_dist<-FALSE
-  newpath<-paste0(pathcat::path.cat(getwd(), path), getOption('depwalker.metadata_save_extension'))
+  newpath<-paste0(pathcat::path.cat(getwd(), path, metadata$path), getOption('depwalker.metadata_save_extension'))
   if(!is_inmemory(metadata)) {
     if (get_path(metadata, path)!=get_path(metadata, metadata$path)) {
       stop("We still don't support re-writing already saved task. ")
@@ -89,6 +89,8 @@ make_sure_metadata_is_saved<-function(metadata, path=NULL, flag_save_in_backgrou
     }
   }
 
+  metadata$path<-pathcat::path.cat(getwd(), path, metadata$path)
+
   tryCatch({
     lock<-acquire_lock(metadata)
 
@@ -113,14 +115,14 @@ make_sure_metadata_is_saved<-function(metadata, path=NULL, flag_save_in_backgrou
       all_objects<-objectstorage::lists_to_df(metadata$inputobjects)
       all_objects<-dplyr::filter(all_objects, ignored==FALSE)
       all_objects<-all_objects$name
-      objectrecords_storage<-get_path(metadata, metadata$objectrecords_storage, extension = 'objectstorage')
-      if(!file.exists(objectrecords_storage)) {
-        objectstorage::create_objectstorage(objectrecords_storage)
+      inputobjects_storage<-get_path(metadata, metadata$inputobjects_storage, extension = 'objectstorage')
+      if(!file.exists(inputobjects_storage)) {
+        objectstorage::create_objectstorage(inputobjects_storage)
       }
-      objst_items<-objectstorage::list_runtime_objects(objectrecords_storage)$objectname
+      objst_items<-objectstorage::list_runtime_objects(inputobjects_storage)$objectname
 
 
-      objectstorage::modify_runtime_objects(storagepath = objectrecords_storage, obj.environment = metadata$runtime_environment,
+      objectstorage::modify_runtime_objects(storagepath = inputobjects_storage, obj.environment = metadata$runtime_environment,
                                             objects_to_add = all_objects,
                                             objects_to_remove = setdiff(objst_items, all_objects))
     }
@@ -148,9 +150,9 @@ make_sure_metadata_is_saved<-function(metadata, path=NULL, flag_save_in_backgrou
     save.metadata(metadata)
 
   },
-  finally = function(e) {release_lock(metadata)} )
+  finally = {release_lock(metadata)} )
   assertMetadata(metadata)
-
+  return(metadata)
 }
 
 
@@ -159,65 +161,34 @@ make_sure_metadata_is_saved<-function(metadata, path=NULL, flag_save_in_backgrou
 save.metadata<-function(metadata)
 {
   assertMetadata(metadata)
-  if (is.null(metadata$codepath))
-    metadata$codepath=paste0(basename(metadata$path),'.R')
 
   m<-metadata
   m$path<-NULL
-  m$code<-NULL
-
-  if (!is.null(metadata$execution.directory))
-  {
-    m$execution.directory<-metadata$execution.directory
-  }
-
-  for (i in seq(along.with=m$objectrecords))
-  {
-    o<-m$objectrecords[[i]]
-    # if (!is.null(o$filesize))
-    #   m$objectrecords[[i]]$filesize<-as.character(o$filesize)
-    # if (!is.null(o$size))
-    #   m$objectrecords[[i]]$size<-as.character(o$size)
-    # if (!is.null(o$mtime))
-    #   m$objectrecords[[i]]$mtime<-as.character(o$mtime)
-  }
-
-  for (i in seq(along.with=m$inputobjects))
-  {
-    o<-m$inputobjects[[i]]
-    # if (!is.null(o$filesize))
-    #   m$inputobjects[[i]]$filesize<-as.character(o$filesize)
-    # if (!is.null(o$size))
-    #   m$inputobjects[[i]]$size<-as.character(o$size)
-    # if (!is.null(o$mtime))
-    #   m$inputobjects[[i]]$mtime<-as.character(o$mtime)
-  }
-  m$runtime.environment<-NULL
+  m$runtime_environment<-NULL
 
   #Simple function that saves metadata on disk
 
-  if (!is.null(metadata$timecosts))
+  if (length(metadata$history)>0)
   {
-    if (nrow(metadata$timecosts)>0)
-    {
-      m$timecosts[,walltime         := as.character(walltime)]
-      m$timecosts[,cputime          := as.character(cputime)]
-      m$timecosts[,systemtime       := as.character(systemtime)]
-      # m$timecosts[,membefore        := as.character(membefore)]
-      # m$timecosts[,memafter         := as.character(memafter)]
-      # m$timecosts[,corecount        := as.character(corecount)]
-      # m$timecosts[,virtualcorecount := as.character(virtualcorecount)]
-      # m$timecosts[,busycpus         := as.character(busycpus)]
-    }
+    dfhist<-
+      objectstorage::lists_to_df(metadata$history, list_columns = 'output')
+    m$history<-dfhist
+    m$history[,output:=NULL]
+
+    m$history[,walltime           := as.character(m$history$walltime)]
+    m$timecosts[,cputime          := as.character(m$history$cputime)]
+    m$timecosts[,systemtime       := as.character(m$history$systemtime)]
+    # m$timecosts[,membefore        := as.character(membefore)]
+    # m$timecosts[,memafter         := as.character(memafter)]
+    # m$timecosts[,corecount        := as.character(corecount)]
+    # m$timecosts[,virtualcorecount := as.character(virtualcorecount)]
+    # m$timecosts[,busycpus         := as.character(busycpus)]
   }
 
   y<-yaml::as.yaml(m, precision=15)
-  con<-file(paste0(metadata$path,getOption('metadata.save.extension')),encoding = 'UTF-8')
+  path<-get_path(metadata, metadata$path, extension='metadata')
+  con<-file(path, encoding = 'UTF-8')
   writeLines(y,con)
-  close(con)
-  #  saveRDS(m,file=paste0(metadata.path,metadata.save.extension),compress='xz')
-  con<-file(paste0(metadata$path,'.R'),encoding = 'UTF-8')
-  writeLines(metadata$code,con)
   close(con)
 
   return(metadata)

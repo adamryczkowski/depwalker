@@ -36,7 +36,7 @@ get_path<-function(metadata, path, input_relative_to='metadata', extension='igno
   }
 
   if(extension=='metadata') {
-    ext<-getOption('metadata.save.extension')
+    ext<-getOption('depwalker.metadata_save_extension')
   } else if (extension=='objectstorage') {
     ext<-getOption('objectstorage.index_extension')
   } else if (extension=='lock') {
@@ -45,6 +45,8 @@ get_path<-function(metadata, path, input_relative_to='metadata', extension='igno
     ext<-getOption('depwalker.error_log_extension')
   } else if (extension=='output') {
     ext<-getOption('depwalker.log_extension')
+  } else if (extension=='R') {
+    ext<-'.R'
   } else if (extension=='none') {
     ext<-''
   } else {
@@ -53,7 +55,7 @@ get_path<-function(metadata, path, input_relative_to='metadata', extension='igno
   if(ext!='') {
     ext2<-stringr::str_replace(ext, pattern=stringr::fixed('.'), replacement = '\\.')
     if(!stringr::str_detect(path, stringr::regex(paste0(ext2, '$')))) {
-      path<-paste0(storagepath, ext)
+      path<-paste0(path, ext)
     }
   }
   return(path)
@@ -98,7 +100,37 @@ get_inputfiles_as_df<-function(metadata) {
     browser()
     stop("There must be at least one record in inputfiles")
   }
-  df<-objectstorage::lists_to_df(metadata$inputfiles)
+  df<-objectstorage::lists_to_df(metadata$inputfiles, list_columns = 'code')
+}
+
+get_inputobjects_as_df<-function(metadata, flag_include_ignored=TRUE) {
+  if(length(metadata$inputobjects)==0) {
+    return(tibble::tibble(name=character(0), ignored=logical(0), digest=character(0)))
+  }
+  df<-objectstorage::lists_to_df(metadata$inputobjects)
+  if(!flag_include_ignored) {
+    df<-dplyr::filter(df, ignored==FALSE)
+  }
+  return(df)
+}
+
+inputobjects_storage<-function(metadata) {
+  path<-get_path(metadata, metadata$inputobjects_storage, extension = 'objectstorage')
+  return(path)
+}
+
+objectrecords_storage<-function(metadata) {
+  if(metadata$objectrecords_storage=='') {
+    return(NULL)
+  } else {
+    path<-get_path(metadata, metadata$objectrecords_storage, extension = 'objectstorage')
+    return(path)
+  }
+}
+
+get_parents_as_df<-function(metadata) {
+  df<-objectstorage::lists_to_df(metadata$parents,list_columns = c('names', 'aliasnames','objectdigests'))
+  return(df)
 }
 
 get_history_as_df<-function(metadata) {

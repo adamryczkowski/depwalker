@@ -80,7 +80,8 @@
 #' \item{\strong{objectrecords}}{Dictionary with registered objects produced by the main R script.
 #'       Dictionary key is the object name. }
 #' \item{objectrecords_storage}{Path relative to the path of the metadata, with the objectstorage for
-#'       the objectrecords}
+#'       the objectrecords. If empty string, nothing will ever be cached, which is usefull for tasks easy to compute,
+#'       but producing large objects.}
 #' \item{runtime_environment}{Only runtime. Environment with loaded version of all or some objects defined in \code{inputobjects} member.}
 #' \item{\strong{execution_directory}}{String with the directory when the script should be run. Can be NULL (or absent),
 #'       or string with the directory. Directory can be absolute, or relative to the task's directory.

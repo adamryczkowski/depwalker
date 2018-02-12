@@ -159,12 +159,12 @@ get.objectrecords<-function(metadata, objnames)
 }
 
 get_objectrecords_storagepath<-function(metadata) {
-  path<-metadata$objectrecords_storagepath
+  path<-metadata$objectrecords_storage
   pathcat::path.cat(getwd(), dirname(metadata$path), path)
 }
 
 get_inputobjects_storagepath<-function(metadata) {
-  path<-metadata$inputobjects_storagepath
+  path<-metadata$inputobjects_storage
   pathcat::path.cat(getwd(), dirname(metadata$path), path)
 }
 
