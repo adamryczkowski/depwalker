@@ -114,6 +114,28 @@ get_inputobjects_as_df<-function(metadata, flag_include_ignored=TRUE) {
   return(df)
 }
 
+#' Produces objectrecords as data.frame
+#'
+#' @param filter_objectrecords If specified, only those records will get included in the
+#'        data.frame. Moreover, the data.frame will have records in exactly the same order,
+#'        as there are elements in \code{filter_objectrecords}
+get_objectrecords_as_df<-function(metadata, filter_objectrecords=NULL) {
+  if(length(metadata$objectrecords)==0) {
+    browser() #Objectrecords must contain at least 1 entry
+  }
+  df<-objectstorage::lists_to_df(metadata$objectrecords)
+  if(!is.null(filter_objectrecords))
+  {
+    filter_objectrecords<-intersect(names(metadata$objectrecords), filter_objectrecords)
+    df<-dplyr::filter(df, name %in% filter_objectrecords)
+    ord<-unshuffling_permutation(filter_objectrecords, df$name)
+    df<-df[ord,]
+  }
+  dfstorage<-objectstorage::list_runtime_objects(objectrecords_storage(metadata))
+  df<-dplyr::left_join(df, dfstorage, by=c('name'='objectnames'), suffix=c('_m','_d'))
+  return(df)
+}
+
 inputobjects_storage<-function(metadata) {
   path<-get_path(metadata, metadata$inputobjects_storage, extension = 'objectstorage')
   return(path)
@@ -222,4 +244,16 @@ get_runtime_objects<-function(metadata, flag_include_parents=TRUE, flag_include_
 
 is_inmemory<-function(m) {
   !pathcat::is_absolute_path(m$path)
+}
+
+#' Returns specific subset of objectrecords
+#' @param metadata Task's metadata
+#' @param objnames Character vector with names of objects for which we want to
+#'   get objectrecords
+get_objectrecords<-function(metadata, objnames)
+{
+
+  objectnames<-names(metadata$objectrecords)
+  idx<-which(objectnames %in% objnames )
+  return(metadata$objectrecords[idx])
 }

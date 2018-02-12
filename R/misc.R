@@ -147,16 +147,6 @@ get.fullpath<-function(metadata, path)
 }
 
 
-#' Returns specific subset of objectrecords
-#' @param metadata Task's metadata
-#' @param objnames Character vector with names of objects for which we want to
-#'   get objectrecords
-get.objectrecords<-function(metadata, objnames)
-{
-  objectnames<-sapply(metadata$objectrecords, function(x)x$name)
-  idx<-which(objectnames %in% objnames )
-  return(metadata$objectrecords[idx])
-}
 
 get_objectrecords_storagepath<-function(metadata) {
   path<-metadata$objectrecords_storage
@@ -410,4 +400,14 @@ normalize_text_string<-function(code)
 {
   code<-unlist(strsplit(code,'\n')) #Makes sure each line is in separate element
   return(code)
+}
+
+#' Produces permutation that orders vec into the same order, as ref.
+#'
+#' @param ref Vector with all values unique
+#' @param vec Vector we want to order. Must be a vector of the same elements as ref
+#' @return Permutation \code{ord}, with the property \code{identical(vec[ord],ref)}
+unshuffling_permutation<-function(ref, vec) {
+  ord<-purrr::map_int(ref, ~which(vec %in% .))
+  return(ord)
 }

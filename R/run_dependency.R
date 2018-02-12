@@ -29,56 +29,38 @@
 #'   \code{get.object} returns the object itself, if there is only one object to return,
 #'   a named list of objects, if requested to return more than one object, or \code{NULL} on failure.
 #' @export
-load.object<-function(metadata.path=NULL,
-                      metadata=NULL,
+load_object<-function(metadata=NULL,
                       objectnames=NULL,
-                      target.environment=.GlobalEnv,
-                      flag.save.intermediate.objects=TRUE,
-                      flag.check.md5sum=TRUE,
-                      flag.ignore.mtime=FALSE,
-                      flag.save.in.background=TRUE, flag.check.object.digest=TRUE,
-                      flag.allow.promises=TRUE)
+                      target_environment=.GlobalEnv,
+                      flag_save_intermediate_objects=TRUE,
+                      flag_check_md5sum=TRUE,
+                      flag_save_in_background=FALSE,
+                      flag_check_object_digest=TRUE,
+                      flag_allow_promises=TRUE)
 {
 
-  if (is.null(metadata.path) && is.null(metadata))
-  {
-    stop("You must provider either metadata or metadata.path argument.")
+  if('character' %in% class(metadata)) {
+    metadata<-load_metadata(metadata)
   }
 
-  if (is.null(metadata))
-  {
-    metadata<-load.metadata(metadata.path)
-  } else {
-    metadata <-make.sure.metadata.is.saved(metadata = metadata)
-  }
-
-  if (is.null(metadata.path))
-  {
-    metadata.path<-metadata$path
-  } else {
-    checkmate::assertPathForOutput(metadata.path, overwrite=TRUE)
-  }
-
-  if (is.null(objectnames))
-    objectnames=names(metadata$objectrecords)
+  assertMetadata(metadata)
+  metadata <-make_sure_metadata_is_saved(metadata = metadata)
 
   if (!is.null(objectnames))
   {
     assertVariableNames(objectnames)
   }
 
-  ans<-load.objects.by.metadata(
+  ans<-load_objects_by_metadata(
     metadata=metadata,
-    metadata.path=metadata.path,
     objectnames=objectnames,
     aliasnames=objectnames,
-    target.environment = target.environment,
-    flag.save.intermediate.objects=flag.save.intermediate.objects,
-    flag.check.md5sum=flag.check.md5sum,
-    flag.save.in.background=flag.save.in.background,
-    flag.ignore.mtime = flag.ignore.mtime,
-    flag.check.object.digest=flag.check.object.digest,
-    flag.allow.promises=flag.allow.promises)
+    target_environment = target_environment,
+    flag_save_intermediate_objects=flag_save_intermediate_objects,
+    flag_check_md5sum=flag_check_md5sum,
+    flag_save_in_background=flag_save_in_background,
+    flag_check_object_digest=flag_check_object_digest,
+    flag_allow_promises=flag_allow_promises)
   if(is.null(ans)){
     stop("Error during object execution")
   }
@@ -88,40 +70,21 @@ load.object<-function(metadata.path=NULL,
 #' @export
 #' @describeIn load.object Gets the object by its metadata.
 #' If objectname is Null, then all objects get returned.
-get.object<-function(
-    metadata.path=NULL,
-    metadata=NULL,
+get_object<-function(
+    metadata,
     objectname=NULL,
-    flag.save.intermediate.objects=TRUE,
-    flag.check.md5sum=TRUE,
-    flag.save.in.background=TRUE,
-    flag.check.object.digest=TRUE,
-    flag.ignore.mtime=FALSE,
-    flag.return.list=FALSE)
+    flag_save_intermediate_objects=TRUE,
+    flag_check_md5sum=TRUE,
+    flag_save_in_background=TRUE,
+    flag_check_object_digest=TRUE,
+    flag_return_list=FALSE)
 {
 
-  if (!is.null(metadata.path))
-  {
-    checkmate::assertPathForOutput(metadata.path, overwrite=TRUE)
-    if (!is.null(metadata))
-    {
-      assertMetadata(metadata)
-      if (metadata$path != metadata.path)
-      {
-        stop ("Ambiguosly specified metadata: metadata.path doesn't point to metadata object")
-      }
-    } else {
-      metadata<-depwalker:::load.metadata(metadata.path)
-    }
-  } else {
-    if (!is.null(metadata))
-    {
-      assertMetadata(metadata)
-      metadata.path<-metadata$path
-    } else {
-      stop("You must provide either metadata.path or metadata parameter.")
-    }
+  if('character' %in% class(metadata)) {
+    metadata<-load_metadata(metadata)
   }
+
+  assertMetadata(metadata)
 
   if (is.null(objectname))
   {
@@ -131,15 +94,13 @@ get.object<-function(
   env<-new.env()
 
   assertVariableNames(objectname)
-  ans<-load.object(
-    metadata.path=metadata.path,
+  ans<-load_object(
     metadata=metadata,
     objectnames=objectname,
-    target.environment = env,
-    flag.save.intermediate.objects=flag.save.intermediate.objects,
-    flag.save.in.background=flag.save.in.background,
-    flag.ignore.mtime = flag.ignore.mtime,
-    flag.check.object.digest=flag.check.object.digest)
+    target_environment = env,
+    flag_save_intermediate_objects=flag_save_intermediate_objects,
+    flag_save_in_background=flag_save_in_background,
+    flag_check_object_digest=flag_check_object_digest)
   if (!is.null(ans))
   {
     ans<-list()
@@ -147,7 +108,7 @@ get.object<-function(
     {
       ans[[o]]<-get(o, envir=env)
     }
-    if (length(objectname)>1 || flag.return.list)
+    if (length(objectname)>1 || flag_return_list)
       return(ans)
     return(ans[[1]])
   }
@@ -182,24 +143,19 @@ get.object<-function(
 #'   run metrics will be gathered and returned for use of \code{metadata_dump}.
 #' @return Returns updated metadata on success, and \code{NULL} on failure.
 
-load.objects.by.metadata<-function(
+load_objects_by_metadata<-function(
     metadata=NULL,
-    metadata.path=NULL,
     objectnames,
     aliasnames=NULL,
-    target.environment=.GlobalEnv,
-    flag.save.intermediate.objects=TRUE,
-    flag.check.md5sum=TRUE,
-    flag.save.in.background=TRUE,
-    flag.check.object.digest=TRUE,
-    flag.ignore.mtime=FALSE,
-    flag.estimate.only=FALSE,
-    flag.allow.promises=TRUE) #True oznacza, że się udało
+    target_environment=.GlobalEnv,
+    flag_save_intermediate_objects=TRUE,
+    flag_check_md5sum=TRUE,
+    flag_save_in_background=TRUE,
+    flag_check_object_digest=TRUE,
+    flag_estimate_only=FALSE,
+    flag_allow_promises=TRUE) #True oznacza, że się udało
 {
-  if (is.null(metadata$flag.force.recalculation))
-    flag.force.recalculation<-FALSE
-  else
-    flag.force.recalculation<-metadata$flag.force.recalculation
+  flag_force_recalculation<-metadata$flag_force_recalculation
 
   # if (!flag.force.recalculation )
   # {
@@ -209,6 +165,7 @@ load.objects.by.metadata<-function(
   #     metadata<-code_changed
   #   }
   # }
+  metadata.path<-get_path(metadata = metadata, extension = 'metadata')
   checkmate::assertPathForOutput(metadata.path, overwrite=TRUE)
   assertMetadata(metadata)
   for(n in objectnames)
@@ -222,23 +179,25 @@ load.objects.by.metadata<-function(
     if (length(objectnames)!=length(aliasnames))
       stop("Length of objectnames and aliasnames doesn't match")
   }
-  checkmate::assertFlag(flag.save.intermediate.objects)
-  checkmate::assertFlag(flag.check.md5sum)
-  checkmate::assertFlag(flag.check.object.digest)
+  checkmate::assertFlag(flag_save_intermediate_objects)
+  checkmate::assertFlag(flag_check_md5sum)
+  checkmate::assertFlag(flag_check_object_digest)
 
-  objrecs<-get.objectrecords(metadata, objectnames)
-  if (length(objrecs)< length(objectnames))
+  object_df<-get_objectrecords_as_df(metadata, filter_objectrecords=objectnames)
+  object_df$aliasnames<-aliasnames
+  if (nrow(objrecs)< length(objectnames))
   {
     if(length(objectnames)==1) {
       msg<-paste0("Cannot find object ", objectnames, " in the metadata ", metadata$path)
     } else {
-      msg<-paste0("At least one of the following objects ", paste0(objectnames, collapse=", "), " is not exported in metadata ", metadata$path)
+      msg<-paste0("The following objects are not exported from the task, ",
+                  metadata$path, ": ", paste0(setdiff(objectnames, object_df$name), collapse=','))
     }
     stop(msg)
   }
-  if (length(objrecs)==0)
+  if (nrow(object_df)==0)
   {
-    if (flag.estimate.only)
+    if (flag_estimate_only)
       return(list())
     else
       return(FALSE)
@@ -246,134 +205,110 @@ load.objects.by.metadata<-function(
 
 
 
-  if (flag.estimate.only)
+  if (flag_estimate_only)
   {
-    ans<-list(path=metadata.path, objects=objectnames, load.modes=rep(0, times=length(objectnames)))
-    names(ans$load.modes)<-objectnames
+    ans<-list(path=metadata.path, objects=objectnames, load_modes=rep(0, times=length(objectnames)))
+    names(ans$load_modes)<-objectnames
   } else
   {
-    if(lock.exists(paste0(metadata.path,'.meta'), 120*60)) {
+    if(objectstorage::lock.exists(metadata.path, 120*60)) {
       message(paste0("Waiting to lock ", metadata.path, "..."))
     }
-    wait.for.lock(paste0(metadata.path,'.meta'), 120*60) #max 2 hours
-    create.lock.file(paste0(metadata.path,'.meta'))
+    objectstorage::wait.for.lock(metadata.path, 120*60) #max 2 hours
+    objectstorage::create.lock.file(metadata.path)
     ans<-FALSE
   }
   tryCatch({
-    staleness<-is.cached.value.stale(metadata)
+    browser()
+    staleness<-is_cached_value_stale(metadata)
     if(is.na(staleness)) {
       staleness<-TRUE
     }
-    if(staleness==FALSE && !flag.force.recalculation) {
-      memobjects<-rep(FALSE,times=length(objrecs))
-      for(i in 1:length(objrecs))
+
+    if(staleness==FALSE && !flag_force_recalculation) {
+      # Task is not stale. We can try loading the caches
+      object_df$inmem<-FALSE
+
+      # Try load from memory. All successfully loaded objects mark as TRUE in memobjects
+      for(i in seq(nrow(object_df)))
       {
-        objrec<-objrecs[[i]]
-        aliasname<-aliasnames[i]
         #objectnames<-objectnames[i]
         tryCatch(
-          memobjects[i]<-take.object.from.memory(
-            objectrecord = objrec,
-            aliasname = aliasname,
-            target.environment=target.environment,
-            flag.check.object.digest = flag.check.object.digest,
-            flag.dry.run = flag.estimate.only),
-          error = function(e) release.lock.file(paste0(metadata.path,'.meta'))
+          object_df[i, 'inmem']<-take_object_from_memory(
+            objectrecord = object_df$name[[i]],
+            aliasname = object_df$aliasnames[[i]],
+            target_environment=target_environment,
+            flag_check_object_digest = flag_check_object_digest,
+            flag_dry_run = flag_estimate_only),
+          error = function(e) e
         )
       }
 
-      if (flag.estimate.only)
-        ans$load.modes[memobjects]<-1
 
+      if (flag_estimate_only) {
+        ans$load_modes[[memobjects]]<-1
+      }
 
-      # Objects already processed (already loaded into memory) are not needed to process anymore:
-      #  objrecs<-objrecs[!memobjects]
-      #  aliasnames<-aliasnames[!memobjects]
-      #  objectnames<-objectnames[!memobjects]
-
-      if (sum(memobjects)==length(objrecs))
+      #Do we still need to load from disk?
+      if (sum(object_df$inmem)==length(objrecs))
       {
-        if (flag.estimate.only)
+        if (flag_estimate_only) {
           return(ans)
-        else
-        {
-          release.lock.file(paste0(metadata.path,'.meta'))
+        } else {
           return(metadata)
         }
       }
 
-      diskobjects<-rep(NA, times=length(objrecs))
-      for(i in 1:length(objrecs))
-      {
-        if (memobjects[i])
-          diskobjects[i]<-FALSE #Already processed
-        objrec<-objrecs[[i]]
-        aliasname<-aliasnames[i]
-        if (!is.null(objrec$filesize))
+      #Now we load all remaining objects from disk
+      object_df<-dplyr::filter(object_df, inmem==FALSE)
+      object_df$indisk<-FALSE
+      if(nrow(object_df)>0) {
+        tryCatch(
+          object_df[i, 'indisk']<-
+            objectstorage::load_objects(objectrecords_storage(metadata),
+                                        objectnames=object_df$name,
+                                        aliasnames=object_df$aliasnames,
+                                        envir=target_environment
+                                        ),
+          error = function(e) objectstorage::release.lock.file(metadata.path)
+        )
+
+
+        # Objects already processed (already loaded into memory) are not needed to be processed anymore:
+        if (flag.estimate.only)
         {
-          #  For large objects quick to create and slow to load/save we are better off running the script
-          load.time<-as.numeric(objrec$filesize) * getOption('object.load.speed')
-          if (!is.null(metadata$timecosts))
+          ans$load_modes[diskobjects]<-2
+          ans$disk_load_time<-foreach::foreach(i=seq(along.with=objrecs), .combine='+') %do%
           {
-            if (nrow(metadata$timecosts)==0)
-            {
-              timecosts=sapply(metadata$timecosts, function(tc) tc$systemtime)
-              if (load.time > median(timecosts) *1.3  ) #Czas wczytywania ma być przynajmniej 2xszybszy niż czas tworzenia
-              {
-                diskobjects[i]<-FALSE
-              }
-            }
+            if (memobjects[i])
+              return(0)
+            objrec<-objrecs[[i]]
+            aliasname<-aliasnames[i]
+            if (!is.null(objrec$filesize))
+              return(as.numeric(objrec$filesize) * getOption('object.load.speed'))
+            else
+              return(NA)
           }
         }
-        if (is.na(diskobjects[i]))
-        {
-          tryCatch(
-            diskobjects[i]<-load.object.from.disk(metadata=metadata,
-                                                  objectrecord = objrec,
-                                                  aliasname = aliasname,
-                                                  flag.dont.load = flag.estimate.only,
-                                                  flag.check.md5 = flag.check.md5sum,
-                                                  flag.ignore.mtime=flag.ignore.mtime,
-                                                  target.environment=target.environment,
-                                                  flag.allow.promises=flag.allow.promises)=='OK',
-            error = function(e) release.lock.file(paste0(metadata.path,'.meta'))
-          )
-        }
-      }
 
-      # Objects already processed (already loaded into memory) are not needed to be processed anymore:
-      if (flag.estimate.only)
-      {
-        ans$load.modes[diskobjects]<-2
-        ans$disk.load.time<-foreach::foreach(i=seq(along.with=objrecs), .combine='+') %do%
+
+        #  objrecs<-objrecs[!diskobjects]
+        #  aliasnames<-aliasnames[!diskobjects]
+        #  objectnames<-objectnames[!diskobjects]
+        if (sum(object_df$inmem)+sum(object_df$indisk)==length(objrecs))
         {
-          if (memobjects[i])
-            return(0)
-          objrec<-objrecs[[i]]
-          aliasname<-aliasnames[i]
-          if (!is.null(objrec$filesize))
-            return(as.numeric(objrec$filesize) * getOption('object.load.speed'))
+          if (flag_estimate_only)
+            return(ans)
           else
-            return(NA)
-        }
-      }
-
-
-      #  objrecs<-objrecs[!diskobjects]
-      #  aliasnames<-aliasnames[!diskobjects]
-      #  objectnames<-objectnames[!diskobjects]
-      if (sum(memobjects)+sum(diskobjects==TRUE)==length(objrecs))
-      {
-        if (flag.estimate.only)
-          return(ans)
-        else
-        {
-          release.lock.file(paste0(metadata.path,'.meta'))
-          return(metadata)
+          {
+            objectstorage::release.lock.file(metadata.path)
+            return(metadata)
+          }
         }
       }
     }
-    run.environment<-new.env(parent=target.environment)
+    browser() #Następna linia może jest zła. Jak mam zagnieżdżać environments?
+    run_environment<-new.env(parent=target_environment)
     create.ans<-create.objects(metadata=metadata,
                                metadata.path=metadata.path,
                                objects.to.keep=objectnames,
@@ -396,7 +331,7 @@ load.objects.by.metadata<-function(
     return(create.ans)
 
   },
-  finally=release.lock.file(paste0(metadata.path,'.meta'))
+  finally=objectstorage::release.lock.file(metadata.path)
   )
 
 }

@@ -15,9 +15,11 @@ test_that("Run simple task (1)", expect_equal({
   #debugonce(depwalker:::is_cached_value_stale)
   depwalker:::is_cached_value_stale(m)
 
+
   testf1(tmpdir);
   #system(paste0('nemo ', tmpdir))
   m<-load_metadata(file.path('/tmp/task1', "simple_task"))
+
 
 
 

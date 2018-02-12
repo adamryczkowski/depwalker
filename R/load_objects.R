@@ -13,9 +13,10 @@
 #' @param flag.dry.run If set, it leaves no side effects, just checks for the availability of the object.
 #'
 #' @return \code{TRUE} if object is found and \code{FALSE} otherwise. If true, the object can be found
-#'    in \code{.GlobalEnv} under the name \code{aliasname} if present, and original name.
+#'    in \code{target_environment} under the name \code{aliasname} if present, and original name.
 #'
-take.object.from.memory<-function(objectrecord, aliasname=NULL, target.environment=NULL, flag.check.object.digest=TRUE, flag.dry.run=FALSE)
+take_object_from_memory<-function(objectrecord, aliasname=NULL, target_environment=NULL,
+                                  flag_check_object_digest=TRUE, flag_dry_run=FALSE)
 {
   # Musimy się upewnić, że obiekt w pamięci to ten sam co w parentrecord.
   # Musi spełniać następujące cechy:
@@ -24,34 +25,34 @@ take.object.from.memory<-function(objectrecord, aliasname=NULL, target.environme
   # - objectsize musi się zgadzać lub
   # - objectdigest musi się zgadzać
 
-  if(is.null(target.environment)) {
-    stop("target.environment is an obligatory argument")
+  if(is.null(target_environment)) {
+    stop("target_environment is an obligatory argument")
   }
 
-  if (exists(objectrecord$name,envir = target.environment))
-    obj<-get(x=objectrecord$name, envir = target.environment)
+  if (exists(objectrecord$name,envir = target_environment))
+    obj<-get(x=objectrecord$name, envir = target_environment)
   else
     return(FALSE) #nie ma obiektu lub zła nazwa
 
-  if (!flag.check.object.digest)
+  if (!take_object_from_memory)
   {
-    if (!is.null(aliasname) & !flag.dry.run)
+    if (!is.null(aliasname) & !flag_dry_run)
       if (aliasname!=objectrecord$name)
-        assign(aliasname, obj, envir = target.environment)
+        assign(aliasname, obj, envir = target_environment)
     return(TRUE) #Skoro mamy nie sprawdzać object digestu, to znaczy że na tym etapie obiekt jest ok.
   }
 
   if (is.null(objectrecord$objectdigest))
     return(FALSE) #Nie mamy objectdigestu, więc nie mamy jak sprawdzić, czy obiekt jest OK. Dlatego FALSE
 
-  crc<-calculate.object.digest(objectrecord$name, target.environment)
+  crc<-objectstorage::calculate.object.digest(objectrecord$name, target_environment)
 
   if (objectrecord$objectdigest!=crc)
     return(FALSE)
 
-  if (!is.null(aliasname) & !flag.dry.run)
+  if (!is.null(aliasname) & !flag_dry_run)
     if (aliasname!=objectrecord$name)
-      assign(aliasname, obj, envir = target.environment)
+      assign(aliasname, obj, envir = target_environment)
   return(TRUE)
 }
 
