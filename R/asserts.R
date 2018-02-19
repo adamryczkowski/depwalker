@@ -82,9 +82,11 @@ assertMetadata<-function(metadata, flag_ready_to_run=TRUE)
 }
 
 test_for_elements<-function(colnames, required_items, optional_items=character(0)) {
-  if(!identical(intersect(colnames, required_items), required_items)) {
-    stop(paste0("There following required columns are missing: ",
-                paste0(setdiff(required_items, colnames), collapse = ', ')))
+  if(length(required_items)>0) {
+    if(!identical(intersect(colnames, required_items), required_items)) {
+      stop(paste0("There following required columns are missing: ",
+                  paste0(setdiff(required_items, colnames), collapse = ', ')))
+    }
   }
   if(length(setdiff(colnames, c(required_items, optional_items) ))>0) {
     stop(paste0("The following columns are unexpected: ",
