@@ -64,7 +64,7 @@ get_path<-function(metadata, path, input_relative_to='metadata', extension='igno
 #' @export
 get_main_code<-function(metadata) {
   assertMetadata(metadata)
-  inputdf<-get_inputfiles_as_df(metadata, list_columns='code')
+  inputdf<-get_inputfiles_as_df(metadata)
   inputdf<-dplyr::filter(inputdf, type=='RMain')
   if(nrow(inputdf)!=1) {
     browser() #There must be exactly one record of type RMain
@@ -76,7 +76,7 @@ get_main_code<-function(metadata) {
 get_code<-function(metadata, path) {
   assertMetadata(metadata)
   checkmate::assertString(path)
-  inputdf<-get_inputfiles_as_df(metadata, list_columns='code')
+  inputdf<-get_inputfiles_as_df(metadata)
   inputdf<-dplyr::filter(inputdf, path==path)
   if(nrow(inputdf)!=1) {
     browser() #There must be exactly one record of type RMain
@@ -92,7 +92,7 @@ get_code<-function(metadata, path) {
   } else {
     code<-inputdf$code
   }
-  return(code)
+  return(as.character(code))
 }
 
 get_inputfiles_as_df<-function(metadata) {
@@ -162,7 +162,8 @@ get_history_as_df<-function(metadata) {
                           corecount=integer(0), virtualcorecount=integer(0),
                           output=list(), flag_success=logical(0)))
   } else {
-    df<-objectstorage::lists_to_df(metadata$history, list_columns = 'output')
+#    browser()
+    df<-objectstorage::lists_to_df(metadata$history)
     return(df)
   }
 }
@@ -206,6 +207,11 @@ acquire_lock<-function(metadata) {
 release_lock<-function(metadata) {
   path<-get_path(metadata=metadata, basename(metadata$path), extension='lock')
   objectstorage::release.lock.file(path)
+}
+
+is_metadata_locked<-function(metadata) {
+  path<-get_path(metadata=metadata, basename(metadata$path), extension='lock')
+  objectstorage::lock.exists(path, timeout=getOption('depwalker.default_lock_time'))
 }
 
 # l3<-list(a=3, p='file3', cz=Sys.time())

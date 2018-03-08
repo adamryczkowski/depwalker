@@ -194,12 +194,12 @@ unload.objects<-function(parentrecords, envir=NULL)
 #'
 #'   If \code{estimation.only!=NULL} it returns list used by \code{metadata_dump}
 #'
-load.and.validate.parents<-function(metadata, target.environment=target.environment,
-                                    flag.check.md5=FALSE,estimation.only=NULL,
-                                    flag.ignore.mtime=FALSE)  #FALSE jeśli się nie uda
+load_and_validate_parents<-function(metadata, target_environment=target_environment,
+                                    flag_check_md5=FALSE,estimation_only=NULL)  #FALSE jeśli się nie uda
 {
-  checkmate::assertFlag(flag.check.md5)
   assertMetadata(metadata)
+  checkmate::assertEnvironment(target_environment)
+  checkmate::assertFlag(flag_check_md5)
   #Funkcja upewnia się, że przodkowie metadata są aktualni i wczytani do naszej sesji.
   #Decyzja o tym, aby danego rodzica wczytać równolegle zależy od tego, czy dany rodzic jest
   #memory bound, czy cpu bound. Oczywiście równoleglanie ma sens tylko dla cpu bound.
@@ -207,19 +207,21 @@ load.and.validate.parents<-function(metadata, target.environment=target.environm
 
   if (length(metadata$parents)==0)
   {
-    if(is.logical(estimation.only))
+    if(is.logical(estimation_only))
       return(TRUE)
     else
-      return(estimation.only)
+      return(estimation_only)
   }
 
-  parents.sorted<-sort.parentrecords(metadata = metadata)
+  parents_df<-get_parents_as_df(metadata)
+#  parents.sorted<-sort.parentrecords(metadata = metadata)
   parents.objects<-list()
 
-  for(po in parents.sorted)
+  for(i in seq_len(nrow(parents_df)))
   {
-    m<-load.metadata(pathcat::path.cat(dirname(metadata$path), po$path))
-    o<-get.objectrecords(m, po$names)
+    browser()
+    m<-load_metadata(metadata.path = pathcat::path.cat(dirname(metadata$path), parents_df$path[[i]]))
+    o<-get.objectrecords(m, parents_df$names[[i]])
     parents.objects[[po$path]]<-list(metadata=m, objrec=o, names=po$names, aliasnames=po$aliasnames, metadata.path=po$path)
   }
   if (!is.logical(estimation.only))

@@ -102,11 +102,11 @@ set_runtime_archive<-function(obj.environment, objectnames=NULL,
   archivepath<-pathcat::path.cat(dirname(tasktpath), archive_filename)
   hashattrname<-getOption('reserved_attr_for_hash')
   get_digest<-function(objectname, env) {
-    if(is.null(attr(env[[objname]],hashattrname, exact = TRUE))) {
+    if(is.null(attr(get(x=objectname, envir = env),hashattrname, exact = TRUE))) {
       hash<-depwalker:::calculate.object.digest(objectname, target.environment)
     } else {
-      hash<-attr(env[[objname]],hashattrname, exact = TRUE)
-      setattr(env[[objname]], hashattrname, NULL)
+      hash<-attr(get(x=objectname, envir = env),hashattrname, exact = TRUE)
+      setattr(get(x=objectname, envir = env), hashattrname, NULL)
     }
     return(hash)
   }
@@ -316,6 +316,7 @@ infer_save_locations<-function(metadata, objectnames, environment, default_save_
                                flag_forced_save_filenames=NULL,
                                forced_archive_paths=NULL, compress='gzip', flag_use_tmp_storage=FALSE)
 {
+  browser()
   if(length(objectnames)==0) {
     return(NULL)
   }

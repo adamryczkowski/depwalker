@@ -40,12 +40,12 @@ capture.evaluate<-function(code, envir=.GlobalEnv)
   return(list(output=out, is.error=is_error))
 }
 
-run.script<-function(metadata, objects.to.keep,estimation.only=NULL, run.environment=NULL, flag_do_gc=TRUE)
+run_script<-function(metadata, objects_to_keep, estimation_only=NULL, run_environment=NULL, flag_do_gc=TRUE)
 {
-  if (!is.logical(estimation.only))
+  if (!is.logical(estimation_only))
   {
-    estimation.only$script.time<-script.time(metadata)
-    return(estimation.only)
+    estimation_only$script.time<-script.time(metadata)
+    return(estimation_only)
   }
 
   # outfile=pathcat::path.cat(getwd(), paste0(metadata$path,getOption('depwalker.echo_extension')))
@@ -55,7 +55,7 @@ run.script<-function(metadata, objects.to.keep,estimation.only=NULL, run.environ
   # if (file.exists(errfile))
   #   unlink(errfile)
 
-  vars.before<-c(ls(envir=run.environment, all.names = TRUE), objects.to.keep)
+  vars.before<-c(ls(envir=run_environment, all.names = TRUE), objects_to_keep)
   if(flag_do_gc) {
     gc()
   }
@@ -67,16 +67,18 @@ run.script<-function(metadata, objects.to.keep,estimation.only=NULL, run.environ
     setwd(get_path(metadata, metadata$execution_directory))
   }
 
+#  browser()
   code<-get_main_code(metadata)
+  timestamp<-Sys.time()
 
   time<-as.numeric(system.time(
-    out<-capture.evaluate(code, envir=run.environment)
+    out<-capture.evaluate(code, envir=run_environment)
   ))[1:3]
-  coresinfo<-cpu.count()
+  coresinfo<-cpu_count()
   if(flag_do_gc) {
     gc()
   }
-  if (!is.null(metadata$execution.directory))
+  if (!is.null(metadata$execution_directory))
   {
     setwd(olddir)
   }
@@ -93,12 +95,12 @@ run.script<-function(metadata, objects.to.keep,estimation.only=NULL, run.environ
                                   output=out$output,
                                   flag_success=!out$is.error)
 
-  vars.after<-ls(envir=run.environment, all.names = TRUE)
-  vars.to.delete<-setdiff(setdiff(vars.after, vars.before), objects.to.keep)
+  vars.after<-ls(envir=run_environment, all.names = TRUE)
+  vars.to.delete<-setdiff(setdiff(vars.after, vars.before), objects_to_keep)
   if (length(vars.to.delete)>0)
-    rm(list=vars.to.delete, envir=run.environment)
+    rm(list=vars.to.delete, envir=run_environment)
 
-  existances<-sapply(objects.to.keep, function(n)exists(n, envir=run.environment))
+  existances<-sapply(objects_to_keep, function(n)exists(n, envir=run_environment))
   if (!all(existances))
     return(NULL)
 

@@ -9,7 +9,7 @@ test_that("Run simple task (1)", expect_equal({
   m<-add_inputobject(m, objectname = 'a', object = 12)
   m<-add_objectrecord(m, name='x')
   m<-add_library_entry_simple(m, 'Hmisc')
-  debugonce(depwalker:::release_lock)
+  #debugonce(depwalker:::release_lock)
   m<-make_sure_metadata_is_saved(m, path = '/tmp/task1')
 
   #debugonce(depwalker:::is_cached_value_stale)
@@ -25,10 +25,14 @@ test_that("Run simple task (1)", expect_equal({
 
   if (exists('x',envir=.GlobalEnv))
     rm('x',envir=.GlobalEnv)
-  depwalker:::get.object(metadata=m,
-                         metadata.path=file.path(tmpdir, "task1"),
-                         objectname="x",
-                         flag.save.in.background = FALSE)
+  debugonce(depwalker:::get_object)
+  debugonce(depwalker:::load_object)
+  debugonce(depwalker:::load_objects_by_metadata)
+
+  m<-make_sure_metadata_is_saved(m)
+  get_object(metadata=m,
+             objectname="x",
+             flag_save_in_background = FALSE)
 },1:10))
 
 test_that("Re-run simple task from memory (1)", expect_equal({

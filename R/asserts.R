@@ -5,7 +5,7 @@ assertMetadata<-function(metadata, flag_ready_to_run=TRUE)
                  'parents', 'objectrecords_storage',  'objectrecords',
                  'runtime_environment', 'execution_directory',
                  'flag_never_execute_parallel', 'flag_include_global_env', 'libraries',
-                 'flag_use_tmp_storage', 'flag_force_recalculation', 'timecosts')
+                 'flag_use_tmp_storage', 'flag_force_recalculation', 'history')
   if(length(setdiff(names(metadata), valid_items))>0) {
     stop(paste0("Unkown components of the metadata: ",
                 paste0(setdiff(names(metadata), valid_items)), collapse=', '))
@@ -71,9 +71,9 @@ assertMetadata<-function(metadata, flag_ready_to_run=TRUE)
     assertLibraryMetadata(library, metadata)
   }
 
-  checkmate::assertList(metadata$timecosts)
-  if(length(metadata$timecosts)>0) {
-    dt<-objectstorage::lists_to_df(metadata$timecosts, list_columns = 'output')
+  checkmate::assertList(metadata$history)
+  if(length(metadata$history)>0) {
+    dt<-get_history_as_df(metadata)
     cols<-c('timestamp', 'walltime', 'cputime', 'systemtime','cpumodel', 'membefore',
             'memafter', 'corecount', 'virtualcorecount', 'flag_success')
     test_for_elements(colnames(dt), cols, optional_items = 'output')
@@ -149,7 +149,8 @@ assertObjectRecordMetadata<-function(objectrecord, metadata)
 
   assertVariableName(objectrecord$name)
   path=get_path(metadata, objectrecord$archivepath)
-  assertValidPath(path)
+
+  assertValidPath(path, flag_NA_OK = TRUE)
   assertCompress(objectrecord$compress)
   assertDigest(objectrecord$digest, flag_allow_empty = TRUE)
 }
@@ -220,8 +221,14 @@ assertLibraryType<-function(type, address) {
   }
 }
 
-assertValidPath<-function(path)
+assertValidPath<-function(path, flag_NA_OK=FALSE)
 {
+  if(flag_NA_OK) {
+    checkmate::assertString(path, na.ok = TRUE)
+    if(is.na(path)) {
+      return()
+    }
+  }
   checkmate::assertString(path, pattern= "[^\\0]+")
 }
 

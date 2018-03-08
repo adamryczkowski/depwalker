@@ -214,27 +214,35 @@ save.large.object<-function(obj, file, compress='xz', wait_for=c('save','compres
 #'
 #' @param metadata Metadata that describes the task for which the object is being saved
 #' @param objectnames List of objects to save, or NULL and all objects belonging to the task will be saved.
-#' @param flag.check.md5sum If set, MD5 hash of the saved file will be calculated and included in the
+#' @param flag_check_md5sum If set, MD5 hash of the saved file will be calculated and included in the
 #'   metadata. Default \code{TRUE}
-#' @param flag.save.in.background If \code{TRUE} will try to save all tasks in parallel.
+#' @param flag_save_in_background If \code{TRUE} will try to save all tasks in parallel.
 #' @return updated metadata if success, or string that describe an error if failed.
-save.objects<-function(
+save_objectrecords<-function(
   metadata,
   envir=NULL,
-  objectnames=NULL,
-  flag.check.md5sum=TRUE,
-  flag.save.in.background=TRUE)
+  flag_check_md5sum=TRUE,
+  flag_save_in_background=TRUE)
 {
+  browser()
+
   if(is.null(envir)) {
     stop("envir is obligatory argument")
   }
-  checkmate::assertFlag(flag.save.in.background)
-  if (is.null(objectnames)){
-    objectrecords<-metadata$objectrecords
-  } else {
-    objectrecords<-metadata$objectrecords[objectnames]
+  checkmate::assertFlag(flag_save_in_background)
+
+  ordf<-get_objectrecords_as_df(metadata)
+
+  existing_objdf<-tibble::tibble(existing_name=ls(envir = envir))
+  existing_objdf$exists<-TRUE
+  ordf<-dplyr::left_join(ordf, existing_objdf, by=c('name'='existing_name'))
+  pos<-which(ordf$flag_allow_empty | !ordf$exists)
+  if(length(pos)>0) {
+    stop(paste0("Cannot find the following objects after evaluation of the code: "), paste0(ordf$name[pos], collapse = ', '))
   }
-  if (flag.save.in.background)
+  ordf<-dplyr::filter(ordf, exists)
+
+  if (flag_save_in_background)
   {# nocov start
     newobjectrecords<-tryCatch(
       parallel::mclapply(objectrecords,
@@ -243,24 +251,33 @@ save.objects<-function(
                            save.object(metadata=metadata,
                                        objectrecord=objectrecord,
                                        envir=envir,
-                                       flag.check.md5sum=flag.check.md5sum)
+                                       flag.check.md5sum=flag_check_md5sum)
                          }),
       error=function(e) {class(e)<-'try-error';e})
     # nocov end
 
   }
-  if (!flag.save.in.background || 'try-error' %in% attr(newobjectrecords,'class', exact = TRUE))
+  if (!flag_save_in_background || 'try-error' %in% attr(newobjectrecords,'class', exact = TRUE))
   {
-    newobjectrecords<-lapply(objectrecords,
-                             function(objectrecord)
-                             {
-                               save.object(metadata=metadata,
-                                           objectrecord=objectrecord,
-                                           envir=envir,
-                                           flag.check.md5sum=flag.check.md5sum)
-                             })
+    objectstorage::save_objects(storagepath = objectrecords_storage(metadata),
+                                obj.environment = envir,
+                                objectnames = ordf$name,
+                                forced_archive_paths = ordf$archivepath,
+                                compress = ordf$compress_m)
+    listdf<-objectstorage::list_runtime_objects(storagepath = objectrecords_storage(metadata))
+  }
+  newobjectrecords<-metadata$objectrecords
+  for(i in seq_along(newobjectrecords)) {
+    orname<-newobjectrecords[[i]]$name
+    if(orname %in% listdf$objectnames) {
+      pos<-which(listdf$objectnames == orname)
+      newobjectrecords[[i]]$archivepath <- listdf$archive_filename[[pos]]
+      newobjectrecords[[i]]$compress <- listdf$compress[[pos]]
+      newobjectrecords[[i]]$digest <- listdf$digest[[pos]]
+    }
   }
   metadata$objectrecords<-newobjectrecords
+  assertMetadata(metadata)
   save.metadata(metadata)
   return(metadata)
 }

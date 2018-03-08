@@ -142,7 +142,7 @@
 #' \item{archivepath}{Path to the archive location, where the cached version of the object should be saved
 #'       after execution of the script.
 #'       For large objects it can point to the alternate storage or outside of the
-#'       version-controlled/synchronized directory}
+#'       version-controlled/synchronized directory. NA if default location is desired.}
 #' \item{compress}{Compression method. Currently the only methods supported are:
 #'       \code{xz}, \code{bzip2}, \code{gzip} and \code{false}. Defaults to \code{xz}}
 #' \item{\strong{digest}}{Digest of the object. Important when this task is a parent.}

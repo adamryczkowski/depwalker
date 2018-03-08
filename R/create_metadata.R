@@ -97,8 +97,8 @@ create_metadata<-function(name,
   # if (!all(cols %in% colnames(metadata$timecosts)))
   #   stop("Insufficient columns in metadata$timecosts data.frame")
 
-  timecosts<-list()
-  metadata$timecosts<-timecosts
+  history<-list()
+  metadata$history<-history
   metadata$libraries<-list()
   assertMetadata(metadata, flag_ready_to_run=FALSE)
   return(metadata)
@@ -527,6 +527,7 @@ add_objectrecord<-function(metadata, name, archivepath=NULL, compress='xz', flag
     if(flag_store_abolute_path) {
       stop("Input flag_store_abolute_path and no archivepath was given")
     }
+#    path<-paste0(basename(metadata$path), '_or')
     path<-NA
   }
 
@@ -610,6 +611,7 @@ add_library_entry_simple<-function(metadata, library_name, priority=10) {
 append_history_record<-function(metadata, timestamp, walltime, cputime, systemtime, cpumodel,
                                 membefore, memafter, corecount, virtualcorecount,
                                 output, flag_success) {
+  browser()
   el<-list(timestamp=as.numeric(timestamp),
            walltime=as.numeric(walltime),
            cputime=as.numeric(cputime),
@@ -619,6 +621,6 @@ append_history_record<-function(metadata, timestamp, walltime, cputime, systemti
            corecount=as.integer(corecount), virtualcorecount=as.integer(virtualcorecount),
            output=normalize_text_string(output),
            flag_success=flag_success)
-  metadata$history<-list(metadata$history, list(el))
+  metadata$history<-c(metadata$history, list(el))
   return(metadata)
 }

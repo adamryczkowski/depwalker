@@ -120,7 +120,7 @@ get_object<-function(
 
 #' High level function, that reads objectnames under the names \code{aliasnames}.
 #'
-#' If \code{flag.estimate.only} is present, it returns the detailed execution tree and historic execution metrics
+#' If \code{flag_estimate_only} is present, it returns the detailed execution tree and historic execution metrics
 #'  instead of executing the scripts.
 #'
 #' The function is there to decide whether to read the cached values instead of doing full task run.
@@ -130,16 +130,16 @@ get_object<-function(
 #' @param metadata The metadata object itself. It makes sure, that this metadata is saved to disk.
 #' @param objectnames List of objects to return. If omited, all objects registered in this metadata will be returned.
 #' @param aliasnames List of new names for the created objects.
-#' @param flag.save.intermediate.objects If true, all intermediate objects will be saved, to speed-up future retrieval.
+#' @param flag_save_intermediate_objects If true, all intermediate objects will be saved, to speed-up future retrieval.
 #'   Default: \code{TRUE}.
-#' @param flag.check.md5sum This flag is forwarded to \code{save.object} function and is in effect only if
+#' @param flag_check_md5sum This flag is forwarded to \code{save.object} function and is in effect only if
 #'  \code{flag.save.intermediate.objects==TRUE}. If set, the \code{save.object} would record file's MD5 hash to the
 #'  metadata.
-#' @param flag.save.in.background If set, objects will be saved in background, leaving the foreground thread
+#' @param flag_save_in_background If set, objects will be saved in background, leaving the foreground thread
 #'  ready for other things. Default: \code{TRUE}. Ignored, if \code{flag.save.intermediate.objects==FALSE}.
-#' @param flag.check.object.digest If set, MD5 signature of all created R objects will be computed and
+#' @param flag_check_object_digest If set, MD5 signature of all created R objects will be computed and
 #'  stored in metadata. It will be used to further verify authenticity of the object, when retrieved from memory.
-#' @param flag.estimate.only If set, dry run will be performed, during which the
+#' @param flag_estimate_only If set, dry run will be performed, during which the
 #'   run metrics will be gathered and returned for use of \code{metadata_dump}.
 #' @return Returns updated metadata on success, and \code{NULL} on failure.
 
@@ -165,8 +165,6 @@ load_objects_by_metadata<-function(
   #     metadata<-code_changed
   #   }
   # }
-  metadata.path<-get_path(metadata = metadata, extension = 'metadata')
-  checkmate::assertPathForOutput(metadata.path, overwrite=TRUE)
   assertMetadata(metadata)
   for(n in objectnames)
     assertVariableName(n)
@@ -185,7 +183,7 @@ load_objects_by_metadata<-function(
 
   object_df<-get_objectrecords_as_df(metadata, filter_objectrecords=objectnames)
   object_df$aliasnames<-aliasnames
-  if (nrow(objrecs)< length(objectnames))
+  if (nrow(object_df)< length(objectnames))
   {
     if(length(objectnames)==1) {
       msg<-paste0("Cannot find object ", objectnames, " in the metadata ", metadata$path)
@@ -207,19 +205,18 @@ load_objects_by_metadata<-function(
 
   if (flag_estimate_only)
   {
-    ans<-list(path=metadata.path, objects=objectnames, load_modes=rep(0, times=length(objectnames)))
+    ans<-list(objects=objectnames, load_modes=rep(0, times=length(objectnames)))
     names(ans$load_modes)<-objectnames
   } else
   {
-    if(objectstorage::lock.exists(metadata.path, 120*60)) {
-      message(paste0("Waiting to lock ", metadata.path, "..."))
+
+    if(is_metadata_locked(metadata)) {
+      message(paste0("Waiting to lock ", get_path(metadata=metadata, basename(metadata$path), extension='lock'), "..."))
     }
-    objectstorage::wait.for.lock(metadata.path, 120*60) #max 2 hours
-    objectstorage::create.lock.file(metadata.path)
+    acquire_lock(metadata)
     ans<-FALSE
   }
   tryCatch({
-    browser()
     staleness<-is_cached_value_stale(metadata)
     if(is.na(staleness)) {
       staleness<-TRUE
@@ -250,7 +247,7 @@ load_objects_by_metadata<-function(
       }
 
       #Do we still need to load from disk?
-      if (sum(object_df$inmem)==length(objrecs))
+      if (all(object_df$inmem))
       {
         if (flag_estimate_only) {
           return(ans)
@@ -263,19 +260,26 @@ load_objects_by_metadata<-function(
       object_df<-dplyr::filter(object_df, inmem==FALSE)
       object_df$indisk<-FALSE
       if(nrow(object_df)>0) {
-        tryCatch(
-          object_df[i, 'indisk']<-
-            objectstorage::load_objects(objectrecords_storage(metadata),
-                                        objectnames=object_df$name,
-                                        aliasnames=object_df$aliasnames,
-                                        envir=target_environment
-                                        ),
-          error = function(e) objectstorage::release.lock.file(metadata.path)
-        )
-
+        objects<-objectstorage::list_runtime_objects(storagepath=objectrecords_storage(metadata))$objectnames
+        objects_to_extract<-intersect(objects, object_df$name)
+        if(length(objects_to_extract)>0) {
+          pos<-purrr::map_dbl(objects_to_extract, ~which(. %in% object_df$name))
+          aliasnames<-object_df$aliasnames[pos]
+          tryCatch(
+            tmp<-objectstorage::load_objects(storagepath=objectrecords_storage(metadata),
+                                             objectnames=object_df$name,
+                                             aliasnames=object_df$aliasnames,
+                                             target_environment=target_environment
+            )
+          )
+          if('error' %in% class(ans)) {
+            break
+          }
+          object_df[i, 'indisk']<-tmp
+        }
 
         # Objects already processed (already loaded into memory) are not needed to be processed anymore:
-        if (flag.estimate.only)
+        if (flag_estimate_only)
         {
           ans$load_modes[diskobjects]<-2
           ans$disk_load_time<-foreach::foreach(i=seq(along.with=objrecs), .combine='+') %do%
@@ -295,43 +299,42 @@ load_objects_by_metadata<-function(
         #  objrecs<-objrecs[!diskobjects]
         #  aliasnames<-aliasnames[!diskobjects]
         #  objectnames<-objectnames[!diskobjects]
-        if (sum(object_df$inmem)+sum(object_df$indisk)==length(objrecs))
+        if (sum(object_df$inmem)+sum(object_df$indisk)==nrow(object_df))
         {
           if (flag_estimate_only)
             return(ans)
           else
           {
-            objectstorage::release.lock.file(metadata.path)
             return(metadata)
           }
         }
       }
     }
-    browser() #Następna linia może jest zła. Jak mam zagnieżdżać environments?
+    # TODO Następna linia może jest zła. Jak mam zagnieżdżać environments?
     run_environment<-new.env(parent=target_environment)
-    create.ans<-create.objects(metadata=metadata,
-                               metadata.path=metadata.path,
-                               objects.to.keep=objectnames,
+    create_ans<-create_objects(metadata=metadata,
+                               objects_to_keep=objectnames,
                                objectaliases=aliasnames,
-                               run.environment=run.environment,
-                               target.environment=target.environment,
-                               flag.save.intermediate.objects=flag.save.intermediate.objects,
-                               flag.check.md5sum=flag.check.md5sum,
-                               flag.save.in.background=flag.save.in.background,
-                               estimation.only=ans)
-    if (is.null(create.ans))
+                               run_environment=run_environment,
+                               target_environment=target_environment,
+                               flag_save_intermediate_objects=flag_save_intermediate_objects,
+                               flag_check_md5sum=flag_check_md5sum,
+                               flag_save_in_background=flag_save_in_background,
+                               estimation_only=ans)
+    browser()
+    if (is.null(create_ans))
     {
       return(NULL)
     }
-    if (flag.force.recalculation)
+    if (flag_force_recalculation)
     {
-      create.ans$flag.force.recalculation<-FALSE
-      save.metadata(metadata = create.ans)
+      create_ans$flag_force_recalculation<-FALSE
+      save.metadata(metadata = create_ans)
     }
-    return(create.ans)
+    return(create_ans)
 
   },
-  finally=objectstorage::release.lock.file(metadata.path)
+  finally=release_lock(metadata)
   )
 
 }

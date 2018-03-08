@@ -43,7 +43,7 @@ make_sure_metadata_is_saved<-function(metadata, path=NULL, flag_save_in_backgrou
   assertMetadata(metadata=metadata, flag_ready_to_run=TRUE)
   checkmate::checkChoice(on_overwrite, choices=c('fail','warn','ignore'))
   if(is.null(path)) {
-    path<-''
+    path<-basename(metadata$path)
   }
   flag_clear_on_dist<-FALSE
   newpath<-paste0(pathcat::path.cat(getwd(), path, metadata$path), getOption('depwalker.metadata_save_extension'))
@@ -114,7 +114,7 @@ make_sure_metadata_is_saved<-function(metadata, path=NULL, flag_save_in_backgrou
     if(length(metadata$inputobjects)>0) {
       all_objects<-objectstorage::lists_to_df(metadata$inputobjects)
       all_objects<-dplyr::filter(all_objects, ignored==FALSE)
-      all_objects<-all_objects$name
+      all_objects<-intersect(all_objects$name, names(metadata$runtime_environment))
       inputobjects_storage<-get_path(metadata, metadata$inputobjects_storage, extension = 'objectstorage')
       if(!file.exists(inputobjects_storage)) {
         objectstorage::create_objectstorage(inputobjects_storage)
@@ -122,9 +122,9 @@ make_sure_metadata_is_saved<-function(metadata, path=NULL, flag_save_in_backgrou
       objst_items<-objectstorage::list_runtime_objects(inputobjects_storage)$objectname
 
 
-      objectstorage::modify_runtime_objects(storagepath = inputobjects_storage, obj.environment = metadata$runtime_environment,
-                                            objects_to_add = all_objects,
-                                            objects_to_remove = setdiff(objst_items, all_objects))
+      objectstorage::modify_objects(storagepath = inputobjects_storage, obj.environment = metadata$runtime_environment,
+                                    objects_to_add = all_objects,
+                                    objects_to_remove = setdiff(objst_items, all_objects))
     }
 
     #Saving inputfiles
@@ -168,22 +168,24 @@ save.metadata<-function(metadata)
 
   #Simple function that saves metadata on disk
 
-  if (length(metadata$history)>0)
-  {
-    dfhist<-
-      objectstorage::lists_to_df(metadata$history, list_columns = 'output')
-    m$history<-dfhist
-    m$history[,output:=NULL]
-
-    m$history[,walltime           := as.character(m$history$walltime)]
-    m$timecosts[,cputime          := as.character(m$history$cputime)]
-    m$timecosts[,systemtime       := as.character(m$history$systemtime)]
-    # m$timecosts[,membefore        := as.character(membefore)]
-    # m$timecosts[,memafter         := as.character(memafter)]
-    # m$timecosts[,corecount        := as.character(corecount)]
-    # m$timecosts[,virtualcorecount := as.character(virtualcorecount)]
-    # m$timecosts[,busycpus         := as.character(busycpus)]
+  hists<-metadata$history
+  for(i in seq_along(hists)) {
+    hists[[i]]$output<-NULL
   }
+  m$history<-hists
+  # dfhist<-
+  #   objectstorage::lists_to_df(metadata$history, list_columns = 'output')
+  # m$history<-dfhist
+  # m$history[,output:=NULL]
+  #
+  # m$history[,walltime           := as.numeric(m$history$walltime)]
+  # m$history[,cputime          := as.numeric(m$history$cputime)]
+  # m$history[,systemtime       := as.numeric(m$history$systemtime)]
+  # # m$history[,membefore        := as.character(membefore)]
+  # # m$history[,memafter         := as.character(memafter)]
+  # # m$history[,corecount        := as.character(corecount)]
+  # # m$history[,virtualcorecount := as.character(virtualcorecount)]
+  # # m$history[,busycpus         := as.character(busycpus)]
 
   y<-yaml::as.yaml(m, precision=15)
   path<-get_path(metadata, metadata$path, extension='metadata')
