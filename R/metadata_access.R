@@ -150,8 +150,15 @@ objectrecords_storage<-function(metadata) {
   }
 }
 
+get_libraries_as_df<-function(metadata) {
+  df<-objectstorage::lists_to_df(metadata$library)
+  df<-
+    dplyr::arrange(df, priority, name)
+  return(df)
+}
+
 get_parents_as_df<-function(metadata) {
-  df<-objectstorage::lists_to_df(metadata$parents,list_columns = c('names', 'aliasnames','objectdigests'))
+  df<-objectstorage::lists_to_df(metadata$parents,list_columns = c('names', 'aliasnames','objectdigests', 'matadata'))
   return(df)
 }
 
@@ -200,18 +207,26 @@ write_history_output_file<-function(metadata, flag_clear_history=FALSE) {
 }
 
 acquire_lock<-function(metadata) {
-  path<-get_path(metadata=metadata, basename(metadata$path), extension='lock')
-  objectstorage::create.lock.file(path, timeout=getOption('depwalker.default_lock_time'))
+  if(!is_inmemory(metadata)) {
+    path<-get_path(metadata=metadata, basename(metadata$path), extension='lock')
+    objectstorage::create.lock.file(path, timeout=getOption('depwalker.default_lock_time'))
+  }
 }
 
 release_lock<-function(metadata) {
-  path<-get_path(metadata=metadata, basename(metadata$path), extension='lock')
-  objectstorage::release.lock.file(path)
+  if(!is_inmemory(metadata)) {
+    path<-get_path(metadata=metadata, basename(metadata$path), extension='lock')
+    objectstorage::release.lock.file(path)
+  }
 }
 
 is_metadata_locked<-function(metadata) {
-  path<-get_path(metadata=metadata, basename(metadata$path), extension='lock')
-  objectstorage::lock.exists(path, timeout=getOption('depwalker.default_lock_time'))
+  if(!is_inmemory(metadata)) {
+    path<-get_path(metadata=metadata, basename(metadata$path), extension='lock')
+    objectstorage::lock.exists(path, timeout=getOption('depwalker.default_lock_time'))
+  } else {
+    FALSE
+  }
 }
 
 # l3<-list(a=3, p='file3', cz=Sys.time())
@@ -225,7 +240,7 @@ is_metadata_locked<-function(metadata) {
 #digest
 #ignored - TRUE if the object is optional
 #parent - TRUE if the source is parent, FALSE if inputobject
-get_runtime_objects<-function(metadata, flag_include_parents=TRUE, flag_include_inputobjects=TRUE) {
+get_runtime_objects<-function(metadata, flag_include_parents=TRUE, flag_include_inputobjects=TRUE, flag_remove_ignored=FALSE) {
   df<-tibble::tibble(objectname=character(0), digest=character(0), ignored=logical(0))
   if(flag_include_parents) {
     if(length(metadata$parents)>0) {
@@ -244,6 +259,9 @@ get_runtime_objects<-function(metadata, flag_include_parents=TRUE, flag_include_
         df<-rbind(df, dplyr::select(dfi, objectname=name, digest, ignored))
       }
     }
+  }
+  if(flag_remove_ignored) {
+    df<-dplyr::filter(df, ignored==FALSE)
   }
   return(df)
 }

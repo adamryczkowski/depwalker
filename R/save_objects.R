@@ -224,7 +224,7 @@ save_objectrecords<-function(
   flag_check_md5sum=TRUE,
   flag_save_in_background=TRUE)
 {
-  browser()
+  #browser()
 
   if(is.null(envir)) {
     stop("envir is obligatory argument")

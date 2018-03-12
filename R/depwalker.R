@@ -134,6 +134,7 @@
 #' \item{\strong{objectdigests}}{Digests of the parent objects, filled in when the parent object is run,
 #'       to freeze the parent's state and react
 #'       when the parent has changed, invalidating our object}
+#' \item{parent}{Parent metadata itself, if we wish to add a parent that is not saved on disk}
 #' }
 #'
 #' \strong{Description of the \code{objectrecord} item}:

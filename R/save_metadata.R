@@ -32,13 +32,15 @@
 #' @param flag_check_hash Relevant only if runtime objects are present in metadata and some are already saved to disk.
 #'        If set, prefer \code{file size} and \code{MD5 digest} over \code{file size} and \code{mtime} for assessing
 #'        whether the file already present in disk still contains the correct contents.
+#' @param flag_no_lock Don't lock the metadata during save. This parameter is used only for internal use, don't use it.
 #' @return returns either the \code{metadata} parameter, or if equivalent task's metadata is found on disk,
 #'   it returns the saved metadata.
 #' @export
 #' @seealso \code{\link{save.metadata}} - unconditionally saves task's metadata on disk.
 make_sure_metadata_is_saved<-function(metadata, path=NULL, flag_save_in_background=FALSE,
                                       flag_use_tmp_storage = FALSE, on_overwrite='fail',
-                                      parallel_cpus=NULL, flag_wait=TRUE, flag_check_hash=TRUE)
+                                      parallel_cpus=NULL, flag_wait=TRUE, flag_check_hash=TRUE,
+                                      flag_no_lock=FALSE)
 {
   assertMetadata(metadata=metadata, flag_ready_to_run=TRUE)
   checkmate::checkChoice(on_overwrite, choices=c('fail','warn','ignore'))
@@ -92,7 +94,9 @@ make_sure_metadata_is_saved<-function(metadata, path=NULL, flag_save_in_backgrou
   metadata$path<-pathcat::path.cat(getwd(), path, metadata$path)
 
   tryCatch({
-    lock<-acquire_lock(metadata)
+    if(!flag_no_lock) {
+      lock<-acquire_lock(metadata)
+    }
 
 
     if(length(metadata$inputfiles)>0) {
@@ -150,7 +154,11 @@ make_sure_metadata_is_saved<-function(metadata, path=NULL, flag_save_in_backgrou
     save.metadata(metadata)
 
   },
-  finally = {release_lock(metadata)} )
+  finally = {
+    if(!flag_no_lock) {
+      release_lock(metadata)
+    }
+  } )
   assertMetadata(metadata)
   return(metadata)
 }

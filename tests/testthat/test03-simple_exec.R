@@ -33,6 +33,7 @@ test_that("Run simple task (1)", expect_equal({
   get_object(metadata=m,
              objectname="x",
              flag_save_in_background = FALSE)
+  m<-load_metadata(file.path('/tmp/task1', "simple_task"))
 },1:10))
 
 test_that("Re-run simple task from memory (1)", expect_equal({

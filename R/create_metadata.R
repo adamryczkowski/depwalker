@@ -120,13 +120,18 @@ create_metadata<-function(name,
 #'        with different contents. It will be overwritten. Default FALSE
 #' @param flag_store_abolute_path If set, it will store the absolute path in the metadata. Usefull if you want
 #'        to move the metadata, but keep the code in the original place.
+#' @param ... Other parameters forwarded to \code{\link{make_sure_metadata_is_saved}}, which will be called only
+#'        if metadata is already saved. Otherwise all changes are done in-memory.
 #' @return modified \code{metadata} argument that includes additional source file or NULL if error.
 #' @export
 #' @seealso \code{\link{create_metadata}}, \code{\link{add_parent}}, \code{\link{add_objectrecord}}
 add_source_file<-function(metadata, filepath=NULL, code=NULL, type='RMain',
                           flag_checksum=TRUE, flag_store_abolute_path=FALSE,
-                          flag_force_overwrite=FALSE)
+                          flag_force_overwrite=FALSE, ...)
 {
+  if(!is_inmemory(metadata)) {
+    metadata<-load_metadata(metadata$path)
+  }
   assertMetadata(metadata, flag_ready_to_run=FALSE)
 
   assertSourceType(type)
@@ -206,6 +211,10 @@ add_source_file<-function(metadata, filepath=NULL, code=NULL, type='RMain',
   }
 
   metadata<-append_extra_code(metadata, filepath=path, code=code, flag_checksum=flag_checksum, type = type, digest = hash1)
+  if(!is_inmemory(metadata)) {
+    metadata<-make_sure_metadata_is_saved(metadata, ...)
+  }
+
   return(metadata)
 }
 
@@ -246,16 +255,21 @@ append_extra_code<-function(metadata, filepath, code, flag_checksum, type, diges
 #'        \code{objectnames} as keys) that specified whether a given object should be saved to disk when
 #'        saving metadata. Think about ignored objects as optionally required, given only for efficiency.
 #'        \emph{Task's code cannot assume the ignored objects will be present in memory.}
+#' @param ... Other parameters forwarded to \code{\link{make_sure_metadata_is_saved}}, which will be called only
+#'        if metadata is already saved. Otherwise all changes are done in-memory.
 #' @return modified \code{metadata} with the registered objects and their value.
 #' @export
 add_inputobjects<-function(metadata, objectnames=NULL, envir, flag_ignored=FALSE,
-                          flag_allow_replace=FALSE, flag_allow_remove=TRUE)
+                          flag_allow_replace=FALSE, flag_allow_remove=TRUE, ...)
 {
   if('list' %in% class(envir)) {
     envir<-as.environment(envir)
   }
   if(is.null(objectnames)){
     objectnames<-ls(envir = envir)
+  }
+  if(!is_inmemory(metadata)) {
+    metadata<-load_metadata(metadata$path)
   }
   assertMetadata(metadata, flag_ready_to_run=FALSE)
   checkmate::assertCharacter(objectnames)
@@ -313,30 +327,36 @@ add_inputobjects<-function(metadata, objectnames=NULL, envir, flag_ignored=FALSE
   }
 
   assertMetadata(metadata, flag_ready_to_run=FALSE)
+  if(!is_inmemory(metadata)) {
+    metadata<-make_sure_metadata_is_saved(metadata, ...)
+  }
   return(metadata)
 }
 
 
 #' @export
 add_inputobject<-function(metadata, objectname, object=NULL, flag_ignored=FALSE,
-                           flag_allow_replace=FALSE)
+                           flag_allow_replace=FALSE, ...)
 {
   envir<-new.env()
   assign(x = objectname, value=object, envir=envir)
   metadata<-add_inputobjects(metadata=metadata, objectnames = objectname, envir=envir,
-                      flag_ignored = flag_ignored, flag_allow_replace = flag_allow_replace)
+                      flag_ignored = flag_ignored, flag_allow_replace = flag_allow_replace, ...)
   return(metadata)
 }
 
 #' @export
 remove_inputobject<-function(metadata, objectname, object=NULL, flag_ignored=NULL,
-                          flag_allow_replace=FALSE, flag_allow_remove=TRUE)
+                          flag_allow_replace=FALSE, flag_allow_remove=TRUE, ...)
 {
   if('list' %in% class(envir)) {
     envir<-as.environment(envir)
   }
   if(is.null(objectnames)){
     objectnames<-ls(envir = envir)
+  }
+  if(!is_inmemory(metadata)) {
+    metadata<-load_metadata(metadata$path)
   }
   assertMetadata(metadata, flag_ready_to_run=FALSE)
   checkmate::assertCharacter(objectnames)
@@ -391,6 +411,9 @@ remove_inputobject<-function(metadata, objectname, object=NULL, flag_ignored=NUL
   }
 
   assertMetadata(metadata)
+  if(!is_inmemory(metadata)) {
+    metadata<-make_sure_metadata_is_saved(metadata, ...)
+  }
   return(metadata)
 }
 
@@ -410,12 +433,17 @@ remove_inputobject<-function(metadata, objectname, object=NULL, flag_ignored=NUL
 #' @param aliasname optional argument. If set it specifies alternate name of the imported
 #'   \code{name} object as it is used by the task's R code. This setting allows great
 #'   flexibility in naming task's output objects.
+#' @param ... Other parameters forwarded to \code{\link{make_sure_metadata_is_saved}}, which will be called only
+#'        if metadata is already saved. Otherwise all changes are done in-memory.
 #' @return modified \code{metadata} argument that includes specified parent's record.
 #' @export
 #' @seealso \code{\link{create_metadata}}, \code{\link{add_objectrecord}}
 add_parent<-function(metadata=NULL, name=NULL, parent=NULL, aliasname=NULL, flag_remember_absolute_path=FALSE,
-                     flag_overwrite_parent=FALSE)
+                     flag_overwrite_parent=FALSE, ...)
 {
+  if(!is_inmemory(metadata)) {
+    metadata<-load_metadata(metadata$path)
+  }
   assertMetadata(metadata, flag_ready_to_run=FALSE)
 
   if('character' %in% class(parent)) {
@@ -475,10 +503,16 @@ add_parent<-function(metadata=NULL, name=NULL, parent=NULL, aliasname=NULL, flag
       stop("Parent ", path, " is already present in the list of parents")
     }
   }
+  if(is_inmemory(parent)) {
+    new_parent$metadata<-parent
+  }
   parents[[path]]<-new_parent
   metadata$parents<-parents
 
   assertMetadata(metadata)
+  if(!is_inmemory(metadata)) {
+    metadata<-make_sure_metadata_is_saved(metadata, ...)
+  }
   return(metadata)
 }
 
@@ -504,16 +538,20 @@ add_parent<-function(metadata=NULL, name=NULL, parent=NULL, aliasname=NULL, flag
 #'   want to move the metadata to different folder, and keep the objectrecord in the old place. Default: FALSE
 #'   Makes sense only if \code{archivepath} parameter is used.
 #' @param flag_allow_empty If set, there will be no warning if the script didn't produce this object.
+#' @param ... Other parameters forwarded to \code{\link{make_sure_metadata_is_saved}}, which will be called only
+#'        if metadata is already saved. Otherwise all changes are done in-memory.
 #' @return modified \code{metadata} argument that includes specified object's record.
 #' @export
 #' @seealso \code{\link{create_metadata}}, \code{\link{add_parent}}
 #' @export
-add_objectrecord<-function(metadata, name, archivepath=NULL, compress='xz', flag_store_abolute_path=FALSE, flag_allow_empty=FALSE)
+add_objectrecord<-function(metadata, name, archivepath=NULL, compress='xz',
+                           flag_store_abolute_path=FALSE, flag_allow_empty=FALSE, ...)
 {
+  if(!is_inmemory(metadata)) {
+    metadata<-load_metadata(metadata$path)
+  }
   assertMetadata(metadata, flag_ready_to_run=FALSE)
   checkmate::assertString(name)
-
-
 
   if (!is.null(archivepath))
   {
@@ -549,6 +587,9 @@ add_objectrecord<-function(metadata, name, archivepath=NULL, compress='xz', flag
   metadata$objectrecords<-objectrecords
 
   assertMetadata(metadata, flag_ready_to_run=FALSE)
+  if(!is_inmemory(metadata)) {
+    metadata<-make_sure_metadata_is_saved(metadata, ...)
+  }
   return(metadata)
 }
 
@@ -559,10 +600,15 @@ add_objectrecord<-function(metadata, name, archivepath=NULL, compress='xz', flag
 #'
 #' @param metadata Task metadata
 #' @param library_name Names of the libraries the task uses.
+#' @param ... Other parameters forwarded to \code{\link{make_sure_metadata_is_saved}}, which will be called only
+#'        if metadata is already saved. Otherwise all changes are done in-memory.
 #'
 #' @return updated metadata
 #' @export
-add_library_entry_simple<-function(metadata, library_name, priority=10) {
+add_library_entry_simple<-function(metadata, library_name, priority=10, ...) {
+  if(!is_inmemory(metadata)) {
+    metadata<-load_metadata(metadata$path)
+  }
   assertMetadata(metadata, flag_ready_to_run=FALSE)
   checkmate::assertString(library_name)
 
@@ -605,13 +651,17 @@ add_library_entry_simple<-function(metadata, library_name, priority=10) {
     }
   }
   metadata$libraries[[library_name]]<-entry
+  assertMetadata(netadata, flag_ready_to_run=FALSE)
+  if(!is_inmemory(metadata)) {
+    metadata<-make_sure_metadata_is_saved(metadata, ...)
+  }
   return(metadata)
 }
 
 append_history_record<-function(metadata, timestamp, walltime, cputime, systemtime, cpumodel,
                                 membefore, memafter, corecount, virtualcorecount,
                                 output, flag_success) {
-  browser()
+#  browser()
   el<-list(timestamp=as.numeric(timestamp),
            walltime=as.numeric(walltime),
            cputime=as.numeric(cputime),
@@ -622,5 +672,6 @@ append_history_record<-function(metadata, timestamp, walltime, cputime, systemti
            output=normalize_text_string(output),
            flag_success=flag_success)
   metadata$history<-c(metadata$history, list(el))
+  assertMetadata(netadata)
   return(metadata)
 }

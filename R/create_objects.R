@@ -114,7 +114,7 @@ create_objects<-function(
 
   #Zapisujemy wszystkie wyprodukowane obiekty (nie tylko te, o które byliśmy poproszeni)
   #flag.save.in.background=TRUE
-  if (flag_save_intermediate_objects)
+  if (flag_save_intermediate_objects && !is_inmemory(metadata) )
   {
     if (flag_save_in_background)
     { # nocov start
@@ -149,17 +149,6 @@ create_objects<-function(
 
       #This obsoletes the following
       assign(oa, value=run_environment[[objrec$name]], envir=target_environment)
-
-#      if (objrec$name != oa)
-#      {
-#        eval(parse(text=paste0(oa, '<-', objrec$name)),envir=.GlobalEnv)
-#        if (exists(objrec$name, envir=.GlobalEnv)) # nocov
-#          rm(list=objrec$name,envir=.GlobalEnv) # nocov
-#      }
-#    } else {
-#      if (exists(objrec$name, envir=.GlobalEnv))
-#        rm(list=objrec$name,envir=.GlobalEnv)
-#      flag.do.gc<-TRUE
     }
   }
 

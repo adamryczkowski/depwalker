@@ -230,6 +230,9 @@ why_cached_value_is_stale<-function(m) {
 #' \code{NA} if it cannot decide (maybe because the statistics were overwritten).
 #'
 is_cached_value_stale<-function(m) {
+  if(is_inmemory(m)) {
+    return(TRUE)
+  }
   ans<-why_cached_value_is_stale(m)
 
   # nested_items<-c('parents_mismatch', 'runtime_objects_mismatch', 'source_files_mismatch')

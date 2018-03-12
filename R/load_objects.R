@@ -220,8 +220,12 @@ load_and_validate_parents<-function(metadata, target_environment=target_environm
   for(i in seq_len(nrow(parents_df)))
   {
     browser()
-    m<-load_metadata(metadata.path = pathcat::path.cat(dirname(metadata$path), parents_df$path[[i]]))
-    o<-get.objectrecords(m, parents_df$names[[i]])
+    if(length(parents_df$metadata)>0) {
+      m<-parents_df$metadata[[1]]
+    } else {
+      m<-load_metadata(metadata.path = pathcat::path.cat(dirname(metadata$path), parents_df$path[[i]]))
+    }
+    o<-get_objectrecords(m, parents_df$names[[i]])
     parents.objects[[po$path]]<-list(metadata=m, objrec=o, names=po$names, aliasnames=po$aliasnames, metadata.path=po$path)
   }
   if (!is.logical(estimation.only))
@@ -229,7 +233,7 @@ load_and_validate_parents<-function(metadata, target_environment=target_environm
     for(po in parents.objects)
     {
       objrec=po$objrec
-      estimation.only$parents[po$path]<-load.objects.by.metadata(metadata=po$metadata, metadata.path=po$metadata.path,  objectnames = po$names, aliasnames=po$aliasnames, flag.estimate.only = TRUE, flag.ignore.mtime=flag.ignore.mtime )
+      estimation.only$parents[po$path]<-load_objects_by_metadata(metadata=po$metadata, objectnames = po$names, aliasnames=po$aliasnames, flag.estimate.only = TRUE )
     }
     return(estimation.only)
   }
@@ -247,6 +251,7 @@ load_and_validate_parents<-function(metadata, target_environment=target_environm
   else
     first<-1 #Nie ma żadnego największego. Dlatego bierzemy pierwszy z brzegu
 
+  browser()
   memfree<-memfree()
   is.it.worth.to.parallel<-function(l)
   {

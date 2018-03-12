@@ -129,7 +129,7 @@ assertInputObjectMetadata<-function(inputrecord, metadata)
 assertParentRecordMetadata<-function(parentrecord, metadata)
 {
   valid_items<-c('path', 'names', 'aliasnames', 'objectdigests')
-  test_for_elements(names(parentrecord), valid_items)
+  test_for_elements(names(parentrecord), valid_items, optional_items = 'metadata')
 
   assertVariableNames(parentrecord$names)
   assertVariableNames(parentrecord$aliasnames)
@@ -139,6 +139,10 @@ assertParentRecordMetadata<-function(parentrecord, metadata)
     stop(paste0("Parent tranformation ", parentrecord$name, " cannot be found in ",path))
 
   assertDigest(parentrecord$digest, flag_allow_empty=TRUE)
+  if('metadata' %in% names(parentrecord)) {
+    assertMetadata(parentrecord$metadata)
+    checkmate::assertTRUE(is_inmemory(parentrecord$metadata))
+  }
 }
 
 assertObjectRecordMetadata<-function(objectrecord, metadata)

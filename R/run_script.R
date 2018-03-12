@@ -40,6 +40,26 @@ capture.evaluate<-function(code, envir=.GlobalEnv)
   return(list(output=out, is.error=is_error))
 }
 
+load_libraries<-function(metadata, cran_mirror=NULL) {
+  #Loads/installs the libraries that are declared in the metadata
+  df<-get_libraries_as_df(metadata)
+  browser()
+  for(i in seq_len(nrow(df))) {
+    rec<-df[i,]
+    if(rec$source_type=='CRAN') {
+      install.packages(rec$name)
+    } else if (rec$source_type=='github') {
+      devtools::install_github(rec$source_address)
+    } else if (rec$source_type=='git') {
+
+    } else if (rec$source_type=='local') {
+
+    } else {
+      browser()
+    }
+  }
+}
+
 run_script<-function(metadata, objects_to_keep, estimation_only=NULL, run_environment=NULL, flag_do_gc=TRUE)
 {
   if (!is.logical(estimation_only))
@@ -47,6 +67,17 @@ run_script<-function(metadata, objects_to_keep, estimation_only=NULL, run_enviro
     estimation_only$script.time<-script.time(metadata)
     return(estimation_only)
   }
+
+  #First we verify all the required variables are in place
+  required_objects<-get_runtime_objects(metadata, flag_include_parents=TRUE, flag_include_inputobjects=TRUE,
+                                        flag_remove_ignored=TRUE)$objectname
+  exisitng_objects<-ls(envir = run_environment, all.names = TRUE)
+  missing_objects<-setdiff(required_objects, exisitng_objects)
+  if(length(missing_objects)>0) {
+    stop(paste0("Cannot run the script, because ", paste0(missing_objects, collapse = ', '), " are missing."))
+  }
+
+
 
   # outfile=pathcat::path.cat(getwd(), paste0(metadata$path,getOption('depwalker.echo_extension')))
   # if (file.exists(outfile))

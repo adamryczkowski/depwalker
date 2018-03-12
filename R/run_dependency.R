@@ -44,7 +44,7 @@ load_object<-function(metadata=NULL,
   }
 
   assertMetadata(metadata)
-  metadata <-make_sure_metadata_is_saved(metadata = metadata)
+#  metadata <-make_sure_metadata_is_saved(metadata = metadata)
 
   if (!is.null(objectnames))
   {
@@ -103,6 +103,7 @@ get_object<-function(
     flag_check_object_digest=flag_check_object_digest)
   if (!is.null(ans))
   {
+
     ans<-list()
     for (o in objectname)
     {
@@ -166,6 +167,11 @@ load_objects_by_metadata<-function(
   #   }
   # }
   assertMetadata(metadata)
+  if(!is_inmemory(metadata)) {
+    metadata<-load_metadata(metadata$path)
+  } else {
+    stop("Cannot work with not saved metadata")
+  }
   for(n in objectnames)
     assertVariableName(n)
   if (is.null(aliasnames))
@@ -265,6 +271,7 @@ load_objects_by_metadata<-function(
         if(length(objects_to_extract)>0) {
           pos<-purrr::map_dbl(objects_to_extract, ~which(. %in% object_df$name))
           aliasnames<-object_df$aliasnames[pos]
+          browser()
           tryCatch(
             tmp<-objectstorage::load_objects(storagepath=objectrecords_storage(metadata),
                                              objectnames=object_df$name,
@@ -321,7 +328,7 @@ load_objects_by_metadata<-function(
                                flag_check_md5sum=flag_check_md5sum,
                                flag_save_in_background=flag_save_in_background,
                                estimation_only=ans)
-    browser()
+#    browser()
     if (is.null(create_ans))
     {
       return(NULL)
@@ -334,7 +341,9 @@ load_objects_by_metadata<-function(
     return(create_ans)
 
   },
-  finally=release_lock(metadata)
+  finally={
+    release_lock(metadata)
+  }
   )
 
 }
